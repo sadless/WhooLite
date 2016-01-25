@@ -1,0 +1,16 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    tools:context=".fragment.FrequentlyInputItemDetailActivityFragment"
+    tools:showIn="@layout/activity_frequently_input_item_detail">
+
+    <Spinner
+        android:id="@+id/slot_number"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <include layout="@layout/fragment_detail_base"/>
+</LinearLayout>

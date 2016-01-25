@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.younggeon.whoolite">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".WhooLiteApplication"
+        android:allowBackup="true"
+        android:fullBackupContent="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme">
+        <activity
+            android:name=".activity.WhooLiteActivity"
+            android:label="@string/app_name"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".activity.WelcomeActivity"
+            android:label="@string/title_activity_welcome" />
+
+        <provider
+            android:name=".provider.WhooingProvider"
+            android:authorities="@string/whooing_authority"
+            android:enabled="true"
+            android:exported="false" />
+
+        <activity
+            android:name=".activity.WhooingLoginActivity"
+            android:parentActivityName=".activity.WelcomeActivity"
+            android:theme="@style/AppTheme">
+            meta-data
+            android:name="android.support.PARENT_ACTIVITY"
+            android:value="com.younggeon.whoolite.activity.WelcomeActivity" />
+        </activity>
+        <activity
+            android:name=".activity.FrequentlyInputItemDetailActivity"
+            android:label="@string/title_activity_frequently_input_item_detail"
+            android:parentActivityName=".activity.WhooLiteActivity"
+            android:theme="@style/AppTheme"
+            android:windowSoftInputMode="stateHidden">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.younggeon.whoolite.activity.WhooLiteActivity" />
+        </activity>
+        <activity
+            android:name=".activity.HistoryDetailActivity"
+            android:label="@string/title_activity_history_detail"
+            android:parentActivityName=".activity.WhooLiteActivity"
+            android:theme="@style/AppTheme">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.younggeon.whoolite.activity.WhooLiteActivity" />
+        </activity>
+    </application>
+
+</manifest>
