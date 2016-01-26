@@ -42,7 +42,7 @@ import java.util.concurrent.TimeoutException;
  * Created by sadless on 2015. 9. 23..
  */
 @SuppressWarnings("unchecked")
-public class WhooingLoginFragment extends Fragment implements LoaderManager.LoaderCallbacks<JSONObject> {
+public class WhooingLoginActivityFragment extends Fragment implements LoaderManager.LoaderCallbacks<JSONObject> {
     private static final int LOADER_ID_REQUEST_TOKEN = 1;
     private static final int LOADER_ID_REQUEST_ACCESS_TOKEN = 2;
 
@@ -86,7 +86,7 @@ public class WhooingLoginFragment extends Fragment implements LoaderManager.Load
                     RequestAccessTokenLoader requestAccessTokenLoader
                             = RequestAccessTokenLoader.castLoader(
                                 getLoaderManager()
-                                        .initLoader(LOADER_ID_REQUEST_ACCESS_TOKEN, null, WhooingLoginFragment.this));
+                                        .initLoader(LOADER_ID_REQUEST_ACCESS_TOKEN, null, WhooingLoginActivityFragment.this));
 
                     requestAccessTokenLoader.token = mToken;
                     requestAccessTokenLoader.pin = pin;
@@ -114,9 +114,9 @@ public class WhooingLoginFragment extends Fragment implements LoaderManager.Load
                 Loader requestTokenLoader = getLoaderManager().getLoader(LOADER_ID_REQUEST_TOKEN);
 
                 if (requestTokenLoader != null) {
-                    getLoaderManager().initLoader(LOADER_ID_REQUEST_ACCESS_TOKEN, null, WhooingLoginFragment.this).forceLoad();
+                    getLoaderManager().initLoader(LOADER_ID_REQUEST_ACCESS_TOKEN, null, WhooingLoginActivityFragment.this).forceLoad();
                 } else {
-                    getLoaderManager().initLoader(LOADER_ID_REQUEST_TOKEN, null, WhooingLoginFragment.this).forceLoad();
+                    getLoaderManager().initLoader(LOADER_ID_REQUEST_TOKEN, null, WhooingLoginActivityFragment.this).forceLoad();
                 }
             }
         });
@@ -175,7 +175,7 @@ public class WhooingLoginFragment extends Fragment implements LoaderManager.Load
                     getLoaderManager().destroyLoader(LOADER_ID_REQUEST_ACCESS_TOKEN);
                 } else {
                     Intent intent = new Intent();
-                    String apiKeyFormat = BuildConfig.WHOOING_APP_ID + "=" + BuildConfig.WHOOING_APP_SECRET + "," +
+                    String apiKeyFormat = WhooingKeyValues.APP_ID + "=" + BuildConfig.WHOOING_APP_ID + "," +
                             WhooingKeyValues.TOKEN + "=" + data.optString(WhooingKeyValues.TOKEN) + "," +
                             WhooingKeyValues.SIGNATURE + "=" + sha1(BuildConfig.WHOOING_APP_SECRET + "|" +
                             data.optString(WhooingKeyValues.TOKEN_SECRET)) + "," +
@@ -194,6 +194,16 @@ public class WhooingLoginFragment extends Fragment implements LoaderManager.Load
 
     @Override
     public void onLoaderReset(Loader<JSONObject> loader) {
+    }
+
+    public boolean webViewGoBack() {
+        boolean retVal = sLoginWebView.canGoBack();
+
+        if (retVal) {
+            sLoginWebView.goBack();
+        }
+
+        return retVal;
     }
 
     private String sha1(String str) {

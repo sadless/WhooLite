@@ -127,7 +127,7 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                         null,
                         Accounts.COLUMN_ACCOUNT_TYPE + " != ?",
                         new String[] {WhooingKeyValues.INCOME},
-                        Accounts._ID + " ASC");
+                        Accounts.COLUMN_SORT_ORDER + " ASC");
             }
             case LOADER_ID_RIGHT: {
                 return new CursorLoader(getActivity(),
@@ -135,7 +135,7 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                         null,
                         Accounts.COLUMN_ACCOUNT_TYPE + " != ?",
                         new String[] {WhooingKeyValues.EXPENSES},
-                        Accounts._ID + " ASC");
+                        Accounts.COLUMN_SORT_ORDER + " ASC");
             }
             default: {
                 return null;

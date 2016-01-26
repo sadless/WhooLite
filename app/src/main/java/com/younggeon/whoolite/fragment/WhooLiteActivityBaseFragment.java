@@ -68,6 +68,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
     protected static final int LOADER_ID_MAIN_DATA = 101;
     protected static final int LOADER_ID_DELETE_SELECTED_ITEMS = 102;
+    protected static final int LOADER_ID_REFRESH_MAIN_DATA = 103;
 
     private static final String INSTANCE_STATE_SELECTED_ITEMS = "selected_items";
     private static final String INSTANCE_STATE_SHOW_DELETE_CONFIRM = "show_delete_confirm";
@@ -158,6 +159,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         getLoaderManager().initLoader(LOADER_ID_MAIN_DATA, null, this);
         getLoaderManager().initLoader(LOADER_ID_ACCOUNT, null, this);
         getLoaderManager().initLoader(LOADER_ID_DELETE_SELECTED_ITEMS, null, this);
+        if (getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) != null) {
+            getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA, null, this);
+        }
 
         return view;
     }
@@ -173,8 +177,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     public void onResume() {
         super.onResume();
 
-        if (mActionMode == null) {
-            receiveData();
+        if (mActionMode == null && getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) == null) {
+//            receiveData();
+            getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA, null, this).forceLoad();
         }
     }
 

@@ -8,7 +8,6 @@ import android.os.Bundle;
 import android.support.v4.content.Loader;
 
 import com.android.volley.Request;
-import com.android.volley.toolbox.RequestFuture;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.Entries;
@@ -55,7 +54,7 @@ public class EntriesLoader extends WhooingBaseLoader {
                         mApiKeyFormat,
                         args));
                 try {
-                    String resultString = mRequestFuture.get(10, TimeUnit.SECONDS);
+                    JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
 
                     if (slotNumber > 0) {
                         Uri useCountUri = WhooingProvider.getFrequentItemUseCountUri(sectionId,
@@ -86,28 +85,22 @@ public class EntriesLoader extends WhooingBaseLoader {
                             c.close();
                         }
                     }
-                    if (resultString == null) {
-                        resultCode = -1;
-                    } else {
-                        JSONObject result = new JSONObject(resultString);
+                    resultCode = result.optInt(WhooingKeyValues.CODE);
+                    if (resultCode == WhooingKeyValues.SUCCESS) {
+                        ContentValues cv = new ContentValues();
 
-                        resultCode = result.optInt(WhooingKeyValues.CODE);
-                        if (resultCode == WhooingKeyValues.SUCCESS) {
-                            ContentValues cv = new ContentValues();
-
-                            cv.put(Entries.COLUMN_ENTRY_ID, result.optLong(WhooingKeyValues.ENTRY_ID));
-                            cv.put(Entries.COLUMN_ENTRY_DATE, result.optDouble(WhooingKeyValues.ENTRY_DATE));
-                            cv.put(Entries.COLUMN_LEFT_ACCOUNT_TYPE, result.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
-                            cv.put(Entries.COLUMN_LEFT_ACCOUNT_ID, result.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
-                            cv.put(Entries.COLUMN_RIGHT_ACCOUNT_TYPE, result.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
-                            cv.put(Entries.COLUMN_RIGHT_ACCOUNT_ID, result.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
-                            cv.put(Entries.COLUMN_TITLE, result.optString(WhooingKeyValues.ITEM_TITLE));
-                            cv.put(Entries.COLUMN_MONEY, result.optDouble(WhooingKeyValues.MONEY));
-                            cv.put(Entries.COLUMN_MEMO, result.optString(WhooingKeyValues.MEMO));
-                            getContext().getContentResolver()
-                                    .insert(WhooingProvider.getEntriesUri(sectionId),
-                                            cv);
-                        }
+                        cv.put(Entries.COLUMN_ENTRY_ID, result.optLong(WhooingKeyValues.ENTRY_ID));
+                        cv.put(Entries.COLUMN_ENTRY_DATE, result.optDouble(WhooingKeyValues.ENTRY_DATE));
+                        cv.put(Entries.COLUMN_LEFT_ACCOUNT_TYPE, result.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
+                        cv.put(Entries.COLUMN_LEFT_ACCOUNT_ID, result.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
+                        cv.put(Entries.COLUMN_RIGHT_ACCOUNT_TYPE, result.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
+                        cv.put(Entries.COLUMN_RIGHT_ACCOUNT_ID, result.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
+                        cv.put(Entries.COLUMN_TITLE, result.optString(WhooingKeyValues.ITEM_TITLE));
+                        cv.put(Entries.COLUMN_MONEY, result.optDouble(WhooingKeyValues.MONEY));
+                        cv.put(Entries.COLUMN_MEMO, result.optString(WhooingKeyValues.MEMO));
+                        getContext().getContentResolver()
+                                .insert(WhooingProvider.getEntriesUri(sectionId),
+                                        cv);
                     }
                 } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
                     e.printStackTrace();
@@ -124,18 +117,17 @@ public class EntriesLoader extends WhooingBaseLoader {
 
                 if (cursorIndex == null) {
                     Uri.Builder builder = Uri.parse(URI_ENTRIES).buildUpon();
-                    RequestFuture<String> requestFuture = RequestFuture.newFuture();
                     long entryId = args.getLong(WhooingKeyValues.ENTRY_ID);
 
                     builder.appendPath(entryId + ".json");
                     WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(Request.Method.DELETE,
                             builder.build().toString(),
-                            requestFuture,
-                            requestFuture,
+                            mRequestFuture,
+                            mRequestFuture,
                             mApiKeyFormat));
 
                     try {
-                        JSONObject result = new JSONObject(requestFuture.get(10, TimeUnit.SECONDS));
+                        JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
                         int resultCode = result.optInt(WhooingKeyValues.RESULT);
 
                         if (resultCode == WhooingKeyValues.SUCCESS) {
@@ -178,16 +170,13 @@ public class EntriesLoader extends WhooingBaseLoader {
                     }
                     builder.appendEncodedPath(itemIdsPath + ".json");
                     c.close();
-
-                    RequestFuture<String> requestFuture = RequestFuture.newFuture();
-
                     WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
                             builder.build().toString(),
-                            requestFuture,
-                            requestFuture,
+                            mRequestFuture,
+                            mRequestFuture,
                             mApiKeyFormat));
                     try {
-                        JSONObject result = new JSONObject(requestFuture.get(10, TimeUnit.SECONDS));
+                        JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
                         int resultCode = result.optInt(WhooingKeyValues.CODE);
 
                         if (resultCode == WhooingKeyValues.SUCCESS) {
@@ -212,7 +201,6 @@ public class EntriesLoader extends WhooingBaseLoader {
             }
             case Request.Method.PUT: {
                 Uri.Builder builder = Uri.parse(URI_ENTRIES).buildUpon();
-                RequestFuture<String> requestFuture = RequestFuture.newFuture();
                 int resultCode;
                 long entryId = args.getLong(WhooingKeyValues.ENTRY_ID);
 
@@ -220,13 +208,13 @@ public class EntriesLoader extends WhooingBaseLoader {
                 args.remove(WhooingKeyValues.ENTRY_ID);
                 WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
                         builder.build().toString(),
-                        requestFuture,
-                        requestFuture,
+                        mRequestFuture,
+                        mRequestFuture,
                         mApiKeyFormat,
                         args));
 
                 try {
-                    JSONObject result = new JSONObject(requestFuture.get(10, TimeUnit.SECONDS));
+                    JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
 
                     resultCode = result.optInt(WhooingKeyValues.CODE);
                     if (resultCode == WhooingKeyValues.SUCCESS) {

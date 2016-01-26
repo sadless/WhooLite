@@ -66,8 +66,6 @@ public class Utility {
 
                     operations.add(ContentProviderOperation.newDelete(WhooingProvider.getFrequentItemsUri(sectionId))
                         .build());
-                    operations.add(ContentProviderOperation.newDelete(WhooingProvider.getAccountsUri(sectionId))
-                        .build());
                     operations.add(ContentProviderOperation.newDelete(WhooingProvider.getEntriesUri(sectionId))
                         .build());
                     operations.add(ContentProviderOperation.newDelete(WhooingProvider.getFrequentItemUseCountsUri(sectionId))

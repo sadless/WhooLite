@@ -50,6 +50,7 @@ public class WhooingProvider extends ContentProvider {
     private static final int CODE_ENTRY_ITEM = 10;
     private static final int CODE_FREQUENT_ITEM_USE_COUNTS = 11;
     private static final int CODE_FREQUENT_ITEM_USE_COUNT = 12;
+    private static final int CODE_ACCOUNT_ITEM = 13;
 
     private static String sAuthority;
 
@@ -178,6 +179,9 @@ public class WhooingProvider extends ContentProvider {
                 return ContentResolver.CURSOR_ITEM_BASE_TYPE + "/" + sAuthority + "/" + PATH_FREQUENT_ITEMS +
                         "/" + PATH_USE_COUNT;
             }
+            case CODE_ACCOUNT_ITEM: {
+                return ContentResolver.CURSOR_ITEM_BASE_TYPE + "/" + sAuthority + "/" + PATH_ACCOUNTS;
+            }
             default: {
                 throw new UnsupportedOperationException("Not yet implemented : " + uri);
             }
@@ -269,6 +273,8 @@ public class WhooingProvider extends ContentProvider {
                 PATH_USE_COUNT, CODE_FREQUENT_ITEM_USE_COUNTS);
         mUriMatcher.addURI(sAuthority, PATH_SECTIONS + "/*/" + PATH_FREQUENT_ITEMS + "/" +
                 PATH_USE_COUNT + "/#/*", CODE_FREQUENT_ITEM_USE_COUNT);
+        mUriMatcher.addURI(sAuthority, PATH_SECTIONS + "/*/" + PATH_ACCOUNTS + "/*/*",
+                CODE_ACCOUNT_ITEM);
         mWhooingOpenHelper = new WhooingOpenHelper(getContext());
 
         return true;
@@ -545,6 +551,26 @@ public class WhooingProvider extends ContentProvider {
                         sortOrder);
                 break;
             }
+            case CODE_ACCOUNT_ITEM: {
+                SQLiteQueryBuilder builder = new SQLiteQueryBuilder();
+                List<String> pathSegments = uri.getPathSegments();
+
+                builder.setTables(Accounts.TABLE_NAME);
+                builder.appendWhere(Accounts.COLUMN_SECTION_ID + " = '" +
+                        pathSegments.get(pathSegments.size() - 4) + "' AND " +
+                        Accounts.COLUMN_ACCOUNT_TYPE + " = '" +
+                        pathSegments.get(pathSegments.size() - 2) + "' AND " +
+                        Accounts.COLUMN_ACCOUNT_ID + " = '" +
+                        pathSegments.get(pathSegments.size() - 1) + "'");
+                returnCursor = builder.query(mWhooingOpenHelper.getReadableDatabase(),
+                        projection,
+                        selection,
+                        selectionArgs,
+                        null,
+                        null,
+                        sortOrder);
+                break;
+            }
             default: {
                 throw new UnsupportedOperationException("Not yet implemented : " + uri);
             }
@@ -560,6 +586,15 @@ public class WhooingProvider extends ContentProvider {
         int count;
 
         switch (mUriMatcher.match(uri)) {
+            case CODE_SECTION_ITEM: {
+                count = mWhooingOpenHelper.getWritableDatabase().update(Sections.TABLE_NAME,
+                        values,
+                        DatabaseUtilsCompat.concatenateWhere(selection,
+                                Sections.COLUMN_SECTION_ID + " = ?"),
+                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs,
+                                new String[]{uri.getLastPathSegment()}));
+                break;
+            }
             case CODE_FREQUENT_ITEM: {
                 List<String> pathSegments = uri.getPathSegments();
 
@@ -594,10 +629,24 @@ public class WhooingProvider extends ContentProvider {
                                         FrequentItemUseCount.COLUMN_SLOT_NUMBER + " = ? AND " +
                                         FrequentItemUseCount.COLUMN_ITEM_ID + " = ?"),
                         DatabaseUtilsCompat.appendSelectionArgs(selectionArgs,
-                                new String[] {pathSegments.get(pathSegments.size() - 5),
+                                new String[]{pathSegments.get(pathSegments.size() - 5),
                                         pathSegments.get(pathSegments.size() - 2),
                                         pathSegments.get(pathSegments.size() - 1)}));
                 break;
+            }
+            case CODE_ACCOUNT_ITEM: {
+                List<String> pathSegments = uri.getPathSegments();
+
+                count = mWhooingOpenHelper.getWritableDatabase().update(Accounts.TABLE_NAME,
+                        values,
+                        DatabaseUtilsCompat.concatenateWhere(selection,
+                                Accounts.COLUMN_SECTION_ID + " = ? AND " +
+                                        Accounts.COLUMN_ACCOUNT_TYPE + " = ? AND " +
+                                        Accounts.COLUMN_ACCOUNT_ID + " = ?"),
+                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs,
+                                new String[]{pathSegments.get(pathSegments.size() - 4),
+                                    pathSegments.get(pathSegments.size() - 2),
+                                    pathSegments.get(pathSegments.size() - 1)}));
             }
             default: {
                 throw new UnsupportedOperationException("Not yet implemented");
@@ -682,5 +731,11 @@ public class WhooingProvider extends ContentProvider {
     public static Uri getFrequentItemUseCountsUri(String sectionId) {
         return getFrequentItemsUri(sectionId).buildUpon()
                 .appendPath(PATH_USE_COUNT).build();
+    }
+
+    public static Uri getAccountItemUri(String sectionId, String accountType, String accountId) {
+        return getAccountsUri(sectionId).buildUpon()
+                .appendPath(accountType)
+                .appendPath(accountId).build();
     }
 }

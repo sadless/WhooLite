@@ -13,12 +13,14 @@ public class Sections implements BaseColumns {
     public static final String COLUMN_MEMO = "memo";
     public static final String COLUMN_CURRENCY = "currency";
     public static final String COLUMN_DATE_FORMAT = "date_format";
+    public static final String COLUMN_SORT_ORDER = "sort_order";
 
     public static final int COLUMN_INDEX_SECTION_ID = 1;
     public static final int COLUMN_INDEX_TITLE = 2;
     public static final int COLUMN_INDEX_MEMO = 3;
     public static final int COLUMN_INDEX_CURRENCY = 4;
     public static final int COLUMN_INDEX_DATE_FORMAT = 5;
+    public static final int COLUMN_INDEX_SORT_ORDER = 6;
 
     public static final String CREATE_TABLE_QUERY = "CREATE TABLE " + TABLE_NAME + "(" +
             _ID + " INTEGER PRIMARY KEY," +
@@ -26,5 +28,6 @@ public class Sections implements BaseColumns {
             COLUMN_TITLE + " TEXT," +
             COLUMN_MEMO + " TEXT," +
             COLUMN_CURRENCY + " TEXT," +
-            COLUMN_DATE_FORMAT + " TEXT)";
+            COLUMN_DATE_FORMAT + " TEXT," +
+            COLUMN_SORT_ORDER + " INTEGER)";
 }
