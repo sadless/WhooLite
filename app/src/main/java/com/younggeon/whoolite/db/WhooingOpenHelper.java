@@ -6,7 +6,6 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import com.younggeon.whoolite.db.schema.Accounts;
 import com.younggeon.whoolite.db.schema.Entries;
-import com.younggeon.whoolite.db.schema.FrequentItemUseCount;
 import com.younggeon.whoolite.db.schema.FrequentItems;
 import com.younggeon.whoolite.db.schema.Sections;
 
@@ -27,7 +26,6 @@ public class WhooingOpenHelper extends SQLiteOpenHelper {
         db.execSQL(FrequentItems.CREATE_TABLE_QUERY);
         db.execSQL(Accounts.CREATE_TABLE_QUERY);
         db.execSQL(Entries.CREATE_TABLE_QUERY);
-        db.execSQL(FrequentItemUseCount.CREATE_TABLE_QUERY);
     }
 
     @Override

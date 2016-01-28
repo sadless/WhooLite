@@ -1,24 +1,31 @@
 package com.younggeon.whoolite.whooing.loader;
 
+import android.content.ContentProviderOperation;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.RemoteException;
 import android.support.v4.content.Loader;
 
 import com.android.volley.Request;
+import com.android.volley.toolbox.RequestFuture;
+import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.Entries;
 import com.younggeon.whoolite.db.schema.FrequentItems;
 import com.younggeon.whoolite.provider.WhooingProvider;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -169,6 +176,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                         args.putString(WhooingKeyValues.RIGHT_ACCOUNT_ID,
                                 c.getString(Entries.COLUMN_INDEX_RIGHT_ACCOUNT_ID));
                         resultCode = postFrequentItem(args, slotNumber);
+                        mRequestFuture = RequestFuture.newFuture();
                     }
                     c.close();
 
@@ -227,12 +235,136 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
                     resultCode = deleteFrequentItem(sectionId, oldSlot, itemId);
                     if (resultCode == WhooingKeyValues.SUCCESS) {
+                        mRequestFuture = RequestFuture.newFuture();
                         resultCode = postFrequentItem((Bundle) args.clone(), newSlot);
                     }
                 }
                 args.putInt(ARG_OLD_SLOT, oldSlot);
                 args.putInt(ARG_NEW_SLOT, newSlot);
                 args.putString(WhooingKeyValues.ITEM_ID, itemId);
+
+                return resultCode;
+            }
+            case Request.Method.GET: {
+                String sectionId = args.getString(WhooingKeyValues.SECTION_ID);
+                Uri.Builder builder = Uri.parse(URI_FREQUENT_ITEMS + ".json_array").buildUpon();
+
+                builder.appendQueryParameter(WhooingKeyValues.SECTION_ID, sectionId);
+                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                        builder.build().toString(),
+                        mRequestFuture,
+                        mRequestFuture,
+                        mApiKeyFormat,
+                        args));
+
+                int resultCode;
+
+                try {
+                    JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
+
+                    if ((resultCode = result.optInt(WhooingKeyValues.CODE)) == WhooingKeyValues.SUCCESS) {
+                        ArrayList<ContentProviderOperation> operations = new ArrayList<>();
+                        JSONObject frequentItems = result.optJSONObject(WhooingKeyValues.RESULT);
+                        Iterator<String> keys = frequentItems.keys();
+                        Uri frequentItemsUri = WhooingProvider.getFrequentItemsUri(sectionId);
+                        int sortOrder = 0;
+                        int slotNumber = 1;
+
+                        while (keys.hasNext()) {
+                            JSONArray itemsInSlot = frequentItems.optJSONArray(keys.next());
+                            String ids = null;
+
+                            for (int i = 0; i < itemsInSlot.length(); i++, sortOrder++) {
+                                JSONObject frequentItem = itemsInSlot.optJSONObject(i);
+                                String itemId = frequentItem.optString(WhooingKeyValues.ITEM_ID);
+                                Uri frequentItemUri = WhooingProvider.getFrequentItemUri(sectionId,
+                                        slotNumber,
+                                        itemId);
+                                Cursor c = getContext().getContentResolver().query(
+                                        frequentItemUri,
+                                        null,
+                                        null,
+                                        null,
+                                        null);
+
+                                if (c != null) {
+                                    ContentValues cv = new ContentValues();
+                                    String title = frequentItem.optString(WhooingKeyValues.ITEM_TITLE);
+                                    double money = frequentItem.optDouble(WhooingKeyValues.MONEY);
+                                    String leftAccountType = frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE);
+                                    String leftAccountId = frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_ID);
+                                    String rightAccountType = frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE);
+                                    String rightAccountId = frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID);
+
+                                    if (c.moveToFirst()) {
+                                        if (!c.getString(FrequentItems.COLUMN_INDEX_TITLE).equals(title)) {
+                                            cv.put(FrequentItems.COLUMN_TITLE, title);
+                                        }
+                                        if (Math.abs(c.getDouble(FrequentItems.COLUMN_INDEX_MONEY) - money) > WhooingKeyValues.EPSILON) {
+                                            cv.put(FrequentItems.COLUMN_MONEY, money);
+                                        }
+                                        if (!c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE).equals(leftAccountType)) {
+                                            cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_TYPE, leftAccountType);
+                                        }
+                                        if (!c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID).equals(leftAccountId)) {
+                                            cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_ID, leftAccountId);
+                                        }
+                                        if (!c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE).equals(rightAccountType)) {
+                                            cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_TYPE, rightAccountType);
+                                        }
+                                        if (!c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID).equals(rightAccountId)) {
+                                            cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_ID, rightAccountId);
+                                        }
+                                        if (c.getInt(FrequentItems.COLUMN_INDEX_SORT_ORDER) != sortOrder) {
+                                            cv.put(FrequentItems.COLUMN_SORT_ORDER, sortOrder);
+                                        }
+                                        if (cv.size() > 0) {
+                                            operations.add(ContentProviderOperation.newUpdate(frequentItemUri)
+                                                    .withValues(cv).build());
+                                        }
+                                    } else {
+                                        cv.put(FrequentItems.COLUMN_SLOT_NUMBER, slotNumber);
+                                        cv.put(FrequentItems.COLUMN_ITEM_ID, itemId);
+                                        cv.put(FrequentItems.COLUMN_TITLE, title);
+                                        cv.put(FrequentItems.COLUMN_MONEY, money);
+                                        cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_TYPE, leftAccountType);
+                                        cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_ID, leftAccountId);
+                                        cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_TYPE, rightAccountType);
+                                        cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_ID, rightAccountId);
+                                        cv.put(FrequentItems.COLUMN_SORT_ORDER, sortOrder);
+                                        operations.add(ContentProviderOperation.newInsert(frequentItemsUri)
+                                                .withValues(cv).build());
+                                    }
+                                    c.close();
+                                }
+                                if (ids == null) {
+                                    ids = "('" + itemId + "'";
+                                } else {
+                                    ids += ",'" + itemId + "'";
+                                }
+                            }
+                            if (ids != null) {
+                                ids += ")";
+                                operations.add(ContentProviderOperation.newDelete(frequentItemsUri)
+                                        .withSelection(FrequentItems.COLUMN_SECTION_ID + " = ? AND " +
+                                                        FrequentItems.COLUMN_SLOT_NUMBER + " = ? AND " +
+                                                        FrequentItems.COLUMN_ITEM_ID + " NOT IN " + ids,
+                                                new String[]{sectionId, "" + slotNumber})
+                                        .build());
+                            }
+                            slotNumber++;
+                        }
+                        if (operations.size() > 0) {
+                            getContext().getContentResolver().applyBatch(getContext().getString(R.string.whooing_authority),
+                                    operations);
+                        }
+                    }
+                } catch (InterruptedException | ExecutionException | TimeoutException | JSONException |
+                        RemoteException | OperationApplicationException e) {
+                    e.printStackTrace();
+
+                    resultCode = -1;
+                }
 
                 return resultCode;
             }

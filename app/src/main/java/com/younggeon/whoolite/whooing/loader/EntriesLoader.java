@@ -1,19 +1,24 @@
 package com.younggeon.whoolite.whooing.loader;
 
+import android.content.ContentProviderOperation;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.RemoteException;
 import android.support.v4.content.Loader;
 
 import com.android.volley.Request;
+import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.Entries;
-import com.younggeon.whoolite.db.schema.FrequentItemUseCount;
+import com.younggeon.whoolite.db.schema.Sections;
 import com.younggeon.whoolite.provider.WhooingProvider;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -57,33 +62,33 @@ public class EntriesLoader extends WhooingBaseLoader {
                     JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
 
                     if (slotNumber > 0) {
-                        Uri useCountUri = WhooingProvider.getFrequentItemUseCountUri(sectionId,
-                                slotNumber,
-                                frequentItemId);
-                        Cursor c = getContext().getContentResolver()
-                                .query(useCountUri,
-                                        new String[]{FrequentItemUseCount.COLUMN_USE_COUNT},
-                                        null,
-                                        null,
-                                        null);
-
-                        if (c != null) {
-                            ContentValues cv = new ContentValues();
-
-                            if (c.moveToFirst()) {
-                                cv.put(FrequentItemUseCount.COLUMN_USE_COUNT, c.getInt(0) + 1);
-                                getContext().getContentResolver()
-                                        .update(useCountUri,
-                                                cv,
-                                                null,
-                                                null);
-                            } else {
-                                cv.put(FrequentItemUseCount.COLUMN_USE_COUNT, 1);
-                                getContext().getContentResolver()
-                                        .insert(useCountUri, cv);
-                            }
-                            c.close();
-                        }
+//                        Uri useCountUri = WhooingProvider.getFrequentItemUseCountUri(sectionId,
+//                                slotNumber,
+//                                frequentItemId);
+//                        Cursor c = getContext().getContentResolver()
+//                                .query(useCountUri,
+//                                        new String[]{FrequentItemUseCount.COLUMN_USE_COUNT},
+//                                        null,
+//                                        null,
+//                                        null);
+//
+//                        if (c != null) {
+//                            ContentValues cv = new ContentValues();
+//
+//                            if (c.moveToFirst()) {
+//                                cv.put(FrequentItemUseCount.COLUMN_USE_COUNT, c.getInt(0) + 1);
+//                                getContext().getContentResolver()
+//                                        .update(useCountUri,
+//                                                cv,
+//                                                null,
+//                                                null);
+//                            } else {
+//                                cv.put(FrequentItemUseCount.COLUMN_USE_COUNT, 1);
+//                                getContext().getContentResolver()
+//                                        .insert(useCountUri, cv);
+//                            }
+//                            c.close();
+//                        }
                     }
                     resultCode = result.optInt(WhooingKeyValues.CODE);
                     if (resultCode == WhooingKeyValues.SUCCESS) {
@@ -238,6 +243,120 @@ public class EntriesLoader extends WhooingBaseLoader {
                     resultCode = -1;
                 }
                 args.putLong(WhooingKeyValues.ENTRY_ID, entryId);
+
+                return resultCode;
+            }
+            case Request.Method.GET: {
+                Uri.Builder builder = Uri.parse(URI_ENTRIES).buildUpon();
+
+                builder.appendPath("latest.json")
+                        .appendQueryParameter(WhooingKeyValues.SECTION_ID, sectionId);
+                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                        builder.build().toString(),
+                        mRequestFuture,
+                        mRequestFuture,
+                        mApiKeyFormat));
+
+                int resultCode;
+
+                try {
+                    JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
+
+                    if ((resultCode = result.optInt(WhooingKeyValues.CODE)) == WhooingKeyValues.SUCCESS) {
+                        ArrayList<ContentProviderOperation> operations = new ArrayList<>();
+                        JSONArray entries = result.optJSONArray(WhooingKeyValues.RESULT);
+                        String ids = null;
+                        Uri entriesUri = WhooingProvider.getEntriesUri(sectionId);
+
+                        for (int i = 0; i < entries.length(); i++) {
+                            JSONObject entry = entries.optJSONObject(i);
+                            long entryId = entry.optLong(WhooingKeyValues.ENTRY_ID);
+                            Uri entryItemUri = WhooingProvider.getEntryItemUri(sectionId, entryId);
+                            Cursor c = getContext().getContentResolver().query(
+                                    entryItemUri,
+                                    null,
+                                    null,
+                                    null,
+                                    null);
+
+                            if (c != null) {
+                                ContentValues cv = new ContentValues();
+                                String title = entry.optString(WhooingKeyValues.ITEM_TITLE);
+                                double money = entry.optDouble(WhooingKeyValues.MONEY);
+                                String leftAccountType = entry.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE);
+                                String leftAccountId = entry.optString(WhooingKeyValues.LEFT_ACCOUNT_ID);
+                                String rightAccountType = entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE);
+                                String rightAccountId = entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID);
+                                String memo = entry.optString(WhooingKeyValues.MEMO);
+                                double entryDate = entry.optDouble(WhooingKeyValues.ENTRY_DATE);
+
+                                if (c.moveToFirst()) {
+                                    if (!c.getString(Entries.COLUMN_INDEX_TITLE).equals(title)) {
+                                        cv.put(Entries.COLUMN_TITLE, title);
+                                    }
+                                    if (Math.abs(c.getDouble(Entries.COLUMN_INDEX_MONEY) - money) > WhooingKeyValues.EPSILON) {
+                                        cv.put(Entries.COLUMN_MONEY, money);
+                                    }
+                                    if (!c.getString(Entries.COLUMN_INDEX_LEFT_ACCOUNT_TYPE).equals(leftAccountType)) {
+                                        cv.put(Entries.COLUMN_LEFT_ACCOUNT_TYPE, leftAccountType);
+                                    }
+                                    if (!c.getString(Entries.COLUMN_INDEX_LEFT_ACCOUNT_ID).equals(leftAccountId)) {
+                                        cv.put(Entries.COLUMN_LEFT_ACCOUNT_ID, leftAccountId);
+                                    }
+                                    if (!c.getString(Entries.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE).equals(rightAccountType)) {
+                                        cv.put(Entries.COLUMN_RIGHT_ACCOUNT_TYPE, rightAccountType);
+                                    }
+                                    if (!c.getString(Entries.COLUMN_INDEX_RIGHT_ACCOUNT_ID).equals(rightAccountId)) {
+                                        cv.put(Entries.COLUMN_RIGHT_ACCOUNT_ID, rightAccountId);
+                                    }
+                                    if (!c.getString(Entries.COLUMN_INDEX_MEMO).equals(memo)) {
+                                        cv.put(Entries.COLUMN_MEMO, memo);
+                                    }
+                                    if (Math.abs(c.getDouble(Entries.COLUMN_INDEX_ENTRY_DATE) - entryDate) > WhooingKeyValues.EPSILON) {
+                                        cv.put(Entries.COLUMN_ENTRY_DATE, entryDate);
+                                    }
+                                    if (cv.size() > 0) {
+                                        operations.add(ContentProviderOperation.newUpdate(entryItemUri)
+                                                .withValues(cv).build());
+                                    }
+                                } else {
+                                    cv.put(Entries.COLUMN_ENTRY_ID, entryId);
+                                    cv.put(Entries.COLUMN_TITLE, title);
+                                    cv.put(Entries.COLUMN_MONEY, money);
+                                    cv.put(Entries.COLUMN_LEFT_ACCOUNT_TYPE, leftAccountType);
+                                    cv.put(Entries.COLUMN_LEFT_ACCOUNT_ID, leftAccountId);
+                                    cv.put(Entries.COLUMN_RIGHT_ACCOUNT_TYPE, rightAccountType);
+                                    cv.put(Entries.COLUMN_RIGHT_ACCOUNT_ID, rightAccountId);
+                                    cv.put(Entries.COLUMN_MEMO, memo);
+                                    cv.put(Entries.COLUMN_ENTRY_DATE, entryDate);
+                                    operations.add(ContentProviderOperation.newInsert(entriesUri)
+                                            .withValues(cv).build());
+                                }
+                                c.close();
+                            }
+                            if (ids == null) {
+                                ids = "('" + sectionId + "'";
+                            } else {
+                                ids += ",'" + sectionId + "'";
+                            }
+                        }
+                        if (ids != null) {
+                            ids += ")";
+                            operations.add(ContentProviderOperation.newDelete(entriesUri)
+                                    .withSelection(Sections.COLUMN_SECTION_ID + " NOT IN " + ids, null)
+                                    .build());
+                        }
+                        if (operations.size() > 0) {
+                            getContext().getContentResolver().applyBatch(getContext().getString(R.string.whooing_authority),
+                                    operations);
+                        }
+                    }
+                } catch (JSONException | InterruptedException | ExecutionException | TimeoutException |
+                        RemoteException | OperationApplicationException e) {
+                    e.printStackTrace();
+
+                    resultCode = -1;
+                }
 
                 return resultCode;
             }

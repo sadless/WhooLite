@@ -10,7 +10,6 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -38,10 +37,7 @@ import android.widget.TextView;
 
 import com.amulyakhare.textdrawable.TextDrawable;
 import com.amulyakhare.textdrawable.util.ColorGenerator;
-import com.android.volley.Request;
-import com.android.volley.toolbox.RequestFuture;
 import com.younggeon.whoolite.R;
-import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.Actions;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
@@ -50,14 +46,8 @@ import com.younggeon.whoolite.provider.WhooingProvider;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.WhooingBaseLoader;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.text.NumberFormat;
 import java.util.Currency;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Created by sadless on 2016. 1. 5..
@@ -75,11 +65,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     private static final String INSTANCE_STATE_PROGRESS_DIALOG = "progress_dialog";
     private static final String INSTANCE_STATE_PROGRESS_TITLE = "progress_title";
 
-    abstract protected void storeData(JSONObject result);
     abstract protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager);
     abstract protected Uri getMainDataUri();
 
-    protected Uri mReceiveUri;
     protected int mReceiveFailedStringId;
     protected int mNoDataStringId;
     protected int mDeleteConfirmStringId;
@@ -94,7 +82,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     protected ProgressDialog mProgressDialog;
 
     private Currency mCurrency;
-    private String mApiKeyFormat;
 
     private Button mRetryButton;
     private TextView mEmptyText;
@@ -106,7 +93,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         @Override
         public void onReceive(Context context, Intent intent) {
             setSectionId(intent.getStringExtra(Actions.EXTRA_SECTION_ID));
-            receiveData();
+            getLoaderManager().restartLoader(LOADER_ID_REFRESH_MAIN_DATA,
+                    null,
+                    WhooLiteActivityBaseFragment.this).forceLoad();
             getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, WhooLiteActivityBaseFragment.this);
         }
     };
@@ -140,7 +129,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                         getString(R.string.please_wait));
             }
         }
-        mApiKeyFormat = prefs.getString(PreferenceKeys.API_KEY_FORMAT, null);
         setSectionId(prefs.getString(PreferenceKeys.CURRENT_SECTION_ID, null));
         mProgressBar = (ProgressBar) view.findViewById(R.id.progress);
         mEmptyLayout = (LinearLayout) view.findViewById(R.id.empty_layout);
@@ -152,16 +140,15 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 mEmptyText.setVisibility(View.GONE);
                 mRetryButton.setVisibility(View.GONE);
                 mProgressBar.setVisibility(View.VISIBLE);
-                receiveData();
+                getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA,
+                        null,
+                        WhooLiteActivityBaseFragment.this).forceLoad();
             }
         });
         getActivity().registerReceiver(mReceiver, new IntentFilter(Actions.SECTION_ID_CHANGED));
         getLoaderManager().initLoader(LOADER_ID_MAIN_DATA, null, this);
         getLoaderManager().initLoader(LOADER_ID_ACCOUNT, null, this);
         getLoaderManager().initLoader(LOADER_ID_DELETE_SELECTED_ITEMS, null, this);
-        if (getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) != null) {
-            getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA, null, this);
-        }
 
         return view;
     }
@@ -177,8 +164,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     public void onResume() {
         super.onResume();
 
-        if (mActionMode == null && getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) == null) {
-//            receiveData();
+        if (mActionMode == null && mSectionId != null && getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) == null) {
             getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA, null, this).forceLoad();
         }
     }
@@ -287,6 +273,22 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 getLoaderManager().restartLoader(LOADER_ID_DELETE_SELECTED_ITEMS, null, this);
                 break;
             }
+            case LOADER_ID_REFRESH_MAIN_DATA: {
+                int code = (Integer) data;
+
+                if (code > 0) {
+                    if (Utility.checkResultCodeWithAlert(getActivity(), code)) {
+                        mEmptyText.setText(mNoDataStringId);
+                    }
+                } else {
+                    mEmptyText.setText(mReceiveFailedStringId);
+                }
+                mRetryButton.setVisibility(View.VISIBLE);
+                mEmptyText.setVisibility(View.VISIBLE);
+                mProgressBar.setVisibility(View.GONE);
+                getLoaderManager().destroyLoader(LOADER_ID_REFRESH_MAIN_DATA);
+                break;
+            }
             default: {
                 break;
             }
@@ -359,53 +361,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         } else {
             mCurrency = null;
         }
-    }
-
-    private void receiveData() {
-        new AsyncTask<String, Void, Integer>() {
-            @Override
-            protected void onPostExecute(Integer integer) {
-                super.onPostExecute(integer);
-
-                if (integer > 0) {
-                    if (Utility.checkResultCodeWithAlert(getActivity(), integer)) {
-                        mEmptyText.setText(mNoDataStringId);
-                    }
-                } else {
-                    mEmptyText.setText(mReceiveFailedStringId);
-                }
-                mRetryButton.setVisibility(View.VISIBLE);
-                mEmptyText.setVisibility(View.VISIBLE);
-                mProgressBar.setVisibility(View.GONE);
-            }
-
-            @Override
-            protected Integer doInBackground(String... params) {
-                RequestFuture<String> requestFuture = RequestFuture.newFuture();
-                Uri.Builder builder = mReceiveUri.buildUpon();
-
-                builder.appendQueryParameter(WhooingKeyValues.SECTION_ID, mSectionId);
-                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(Request.Method.GET,
-                        builder.build().toString(),
-                        requestFuture,
-                        requestFuture,
-                        mApiKeyFormat));
-                try {
-                    JSONObject result = new JSONObject(requestFuture.get(10, TimeUnit.SECONDS));
-                    int resultCode = result.optInt(WhooingKeyValues.CODE);
-
-                    if (resultCode == WhooingKeyValues.SUCCESS) {
-                        storeData(result);
-                    }
-
-                    return resultCode;
-                } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
-                    e.printStackTrace();
-
-                    return -1;
-                }
-            }
-        }.execute();
     }
 
     private void showDeleteConfirm() {

@@ -20,7 +20,6 @@ import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.db.WhooingOpenHelper;
 import com.younggeon.whoolite.db.schema.Accounts;
 import com.younggeon.whoolite.db.schema.Entries;
-import com.younggeon.whoolite.db.schema.FrequentItemUseCount;
 import com.younggeon.whoolite.db.schema.FrequentItems;
 import com.younggeon.whoolite.db.schema.Sections;
 
@@ -36,7 +35,6 @@ public class WhooingProvider extends ContentProvider {
     private static final String PATH_TYPE_COUNTS = "type_counts";
     private static final String PATH_ENTRIES = "entries";
     private static final String PATH_DATE_COUNTS = "date_counts";
-    private static final String PATH_USE_COUNT = "use_count";
 
     private static final int CODE_SECTIONS = 1;
     private static final int CODE_FREQUENT_ITEMS = 2;
@@ -48,8 +46,6 @@ public class WhooingProvider extends ContentProvider {
     private static final int CODE_ENTRY_DATE_COUNTS = 8;
     private static final int CODE_FREQUENT_ITEM = 9;
     private static final int CODE_ENTRY_ITEM = 10;
-    private static final int CODE_FREQUENT_ITEM_USE_COUNTS = 11;
-    private static final int CODE_FREQUENT_ITEM_USE_COUNT = 12;
     private static final int CODE_ACCOUNT_ITEM = 13;
 
     private static String sAuthority;
@@ -85,7 +81,7 @@ public class WhooingProvider extends ContentProvider {
 
                 count = mWhooingOpenHelper.getWritableDatabase().delete(Accounts.TABLE_NAME,
                         DatabaseUtilsCompat.concatenateWhere(selection, Accounts.COLUMN_SECTION_ID + " = ?"),
-                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs, new String[] {
+                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs, new String[]{
                                 pathSegments.get(pathSegments.size() - 2)}));
                 break;
             }
@@ -94,7 +90,7 @@ public class WhooingProvider extends ContentProvider {
 
                 count = mWhooingOpenHelper.getWritableDatabase().delete(Entries.TABLE_NAME,
                         DatabaseUtilsCompat.concatenateWhere(selection, Entries.COLUMN_SECTION_ID + " = ?"),
-                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs, new String[] {
+                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs, new String[]{
                                 pathSegments.get(pathSegments.size() - 2)}));
                 break;
             }
@@ -105,7 +101,7 @@ public class WhooingProvider extends ContentProvider {
                         DatabaseUtilsCompat.concatenateWhere(selection, FrequentItems.COLUMN_SECTION_ID + " = ? AND " +
                                 FrequentItems.COLUMN_SLOT_NUMBER + " = ? AND " +
                                 FrequentItems.COLUMN_ITEM_ID + " = ?"),
-                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs, new String[] {
+                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs, new String[]{
                                 pathSegments.get(pathSegments.size() - 4),
                                 pathSegments.get(pathSegments.size() - 2),
                                 pathSegments.get(pathSegments.size() - 1)}));
@@ -114,14 +110,8 @@ public class WhooingProvider extends ContentProvider {
             case CODE_ENTRY_ITEM: {
                 count = mWhooingOpenHelper.getWritableDatabase().delete(Entries.TABLE_NAME,
                         DatabaseUtilsCompat.concatenateWhere(selection, Entries.COLUMN_ENTRY_DATE + " = ?"),
-                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs, new String[] {
+                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs, new String[]{
                                 uri.getLastPathSegment()}));
-                break;
-            }
-            case CODE_FREQUENT_ITEM_USE_COUNTS: {
-                count = mWhooingOpenHelper.getWritableDatabase().delete(FrequentItemUseCount.TABLE_NAME,
-                        selection,
-                        selectionArgs);
                 break;
             }
             default: {
@@ -171,14 +161,6 @@ public class WhooingProvider extends ContentProvider {
             case CODE_ENTRY_ITEM: {
                 return ContentResolver.CURSOR_ITEM_BASE_TYPE + "/" + sAuthority + "/" + PATH_ENTRIES;
             }
-            case CODE_FREQUENT_ITEM_USE_COUNTS: {
-                return ContentResolver.CURSOR_DIR_BASE_TYPE + "/" + sAuthority + "/" + PATH_FREQUENT_ITEMS +
-                        "/" + PATH_USE_COUNT;
-            }
-            case CODE_FREQUENT_ITEM_USE_COUNT: {
-                return ContentResolver.CURSOR_ITEM_BASE_TYPE + "/" + sAuthority + "/" + PATH_FREQUENT_ITEMS +
-                        "/" + PATH_USE_COUNT;
-            }
             case CODE_ACCOUNT_ITEM: {
                 return ContentResolver.CURSOR_ITEM_BASE_TYPE + "/" + sAuthority + "/" + PATH_ACCOUNTS;
             }
@@ -226,17 +208,6 @@ public class WhooingProvider extends ContentProvider {
                         values);
                 break;
             }
-            case CODE_FREQUENT_ITEM_USE_COUNT: {
-                List<String> pathSegments = uri.getPathSegments();
-
-                values.put(FrequentItemUseCount.COLUMN_SECTION_ID, pathSegments.get(pathSegments.size() - 5));
-                values.put(FrequentItemUseCount.COLUMN_SLOT_NUMBER, pathSegments.get(pathSegments.size() - 2));
-                values.put(FrequentItemUseCount.COLUMN_ITEM_ID, pathSegments.get(pathSegments.size() - 1));
-                id = mWhooingOpenHelper.getWritableDatabase().insert(FrequentItemUseCount.TABLE_NAME,
-                        null,
-                        values);
-                break;
-            }
             default: {
                 throw new UnsupportedOperationException("Not yet implemented : " + uri);
             }
@@ -269,10 +240,6 @@ public class WhooingProvider extends ContentProvider {
         mUriMatcher.addURI(sAuthority, PATH_SECTIONS + "/*/" + PATH_FREQUENT_ITEMS + "/#/*",
                 CODE_FREQUENT_ITEM);
         mUriMatcher.addURI(sAuthority, PATH_SECTIONS + "/*/" + PATH_ENTRIES + "/#", CODE_ENTRY_ITEM);
-        mUriMatcher.addURI(sAuthority, PATH_SECTIONS + "/*/" + PATH_FREQUENT_ITEMS + "/" +
-                PATH_USE_COUNT, CODE_FREQUENT_ITEM_USE_COUNTS);
-        mUriMatcher.addURI(sAuthority, PATH_SECTIONS + "/*/" + PATH_FREQUENT_ITEMS + "/" +
-                PATH_USE_COUNT + "/#/*", CODE_FREQUENT_ITEM_USE_COUNT);
         mUriMatcher.addURI(sAuthority, PATH_SECTIONS + "/*/" + PATH_ACCOUNTS + "/*/*",
                 CODE_ACCOUNT_ITEM);
         mWhooingOpenHelper = new WhooingOpenHelper(getContext());
@@ -302,13 +269,6 @@ public class WhooingProvider extends ContentProvider {
                 String[] newProjection;
 
                 builder.setTables(FrequentItems.TABLE_NAME +
-                        " LEFT JOIN " + FrequentItemUseCount.TABLE_NAME + " ON " +
-                        FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_SECTION_ID + " = " +
-                        FrequentItemUseCount.TABLE_NAME + "." + FrequentItemUseCount.COLUMN_SECTION_ID + " AND " +
-                        FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_SLOT_NUMBER + " = " +
-                        FrequentItemUseCount.TABLE_NAME + "." + FrequentItemUseCount.COLUMN_SLOT_NUMBER + " AND " +
-                        FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_ITEM_ID + " = " +
-                        FrequentItemUseCount.TABLE_NAME + "." + FrequentItemUseCount.COLUMN_ITEM_ID +
                         " LEFT JOIN " + Accounts.TABLE_NAME + " AS " + FrequentItems.PREFIX_LEFT + " ON " +
                         FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_SECTION_ID + " = " +
                         FrequentItems.PREFIX_LEFT + "." + Accounts.COLUMN_SECTION_ID + " AND " +
@@ -343,7 +303,6 @@ public class WhooingProvider extends ContentProvider {
                         newProjection[i] = column;
                     }
                 }
-                newProjection[newProjection.length - 3] = FrequentItemUseCount.COLUMN_USE_COUNT;
                 newProjection[newProjection.length - 2] = FrequentItems.PREFIX_LEFT + "." + Accounts.COLUMN_TITLE + " AS " +
                         FrequentItems.PREFIX_LEFT + "_" + Accounts.COLUMN_TITLE;
                 newProjection[newProjection.length - 1] = FrequentItems.PREFIX_RIGHT + "." + Accounts.COLUMN_TITLE + " AS " +
@@ -531,26 +490,6 @@ public class WhooingProvider extends ContentProvider {
                         sortOrder);
                 break;
             }
-            case CODE_FREQUENT_ITEM_USE_COUNT: {
-                SQLiteQueryBuilder builder = new SQLiteQueryBuilder();
-                List<String> pathSegments = uri.getPathSegments();
-
-                builder.setTables(FrequentItemUseCount.TABLE_NAME);
-                builder.appendWhere(FrequentItemUseCount.COLUMN_SECTION_ID + " = '" +
-                        pathSegments.get(pathSegments.size() - 5) + "' AND " +
-                        FrequentItemUseCount.COLUMN_SLOT_NUMBER + " = " +
-                        pathSegments.get(pathSegments.size() - 2) + " AND " +
-                        FrequentItemUseCount.COLUMN_ITEM_ID + " = '" +
-                        pathSegments.get(pathSegments.size() - 1) + "'");
-                returnCursor = builder.query(mWhooingOpenHelper.getReadableDatabase(),
-                        projection,
-                        selection,
-                        selectionArgs,
-                        null,
-                        null,
-                        sortOrder);
-                break;
-            }
             case CODE_ACCOUNT_ITEM: {
                 SQLiteQueryBuilder builder = new SQLiteQueryBuilder();
                 List<String> pathSegments = uri.getPathSegments();
@@ -617,21 +556,6 @@ public class WhooingProvider extends ContentProvider {
                                 Entries.COLUMN_ENTRY_ID + " = ?"),
                         DatabaseUtilsCompat.appendSelectionArgs(selectionArgs,
                                 new String[]{uri.getLastPathSegment()}));
-                break;
-            }
-            case CODE_FREQUENT_ITEM_USE_COUNT: {
-                List<String> pathSegments = uri.getPathSegments();
-
-                count = mWhooingOpenHelper.getWritableDatabase().update(FrequentItemUseCount.TABLE_NAME,
-                        values,
-                        DatabaseUtilsCompat.concatenateWhere(selection,
-                                FrequentItemUseCount.COLUMN_SECTION_ID + " = ? AND " +
-                                        FrequentItemUseCount.COLUMN_SLOT_NUMBER + " = ? AND " +
-                                        FrequentItemUseCount.COLUMN_ITEM_ID + " = ?"),
-                        DatabaseUtilsCompat.appendSelectionArgs(selectionArgs,
-                                new String[]{pathSegments.get(pathSegments.size() - 5),
-                                        pathSegments.get(pathSegments.size() - 2),
-                                        pathSegments.get(pathSegments.size() - 1)}));
                 break;
             }
             case CODE_ACCOUNT_ITEM: {
@@ -719,18 +643,6 @@ public class WhooingProvider extends ContentProvider {
 
     public static Uri getEntryItemUri(String sectionId, long entryId) {
         return ContentUris.withAppendedId(getEntriesUri(sectionId), entryId);
-    }
-
-    public static Uri getFrequentItemUseCountUri(String sectionId, int slotNumber, String itemId) {
-        return getFrequentItemsUri(sectionId).buildUpon()
-                .appendPath(PATH_USE_COUNT)
-                .appendPath("" + slotNumber)
-                .appendPath(itemId).build();
-    }
-
-    public static Uri getFrequentItemUseCountsUri(String sectionId) {
-        return getFrequentItemsUri(sectionId).buildUpon()
-                .appendPath(PATH_USE_COUNT).build();
     }
 
     public static Uri getAccountItemUri(String sectionId, String accountType, String accountId) {

@@ -14,7 +14,6 @@ import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.Accounts;
-import com.younggeon.whoolite.db.schema.Sections;
 import com.younggeon.whoolite.provider.WhooingProvider;
 
 import org.json.JSONArray;
@@ -56,8 +55,7 @@ public class AccountsLoader extends WhooingBaseLoader {
                         builder.build().toString(),
                         mRequestFuture,
                         mRequestFuture,
-                        mApiKeyFormat,
-                        args));
+                        mApiKeyFormat));
 
                 int resultCode;
 
@@ -96,13 +94,13 @@ public class AccountsLoader extends WhooingBaseLoader {
 
                                     if (c.moveToFirst()) {
                                         if (!c.getString(Accounts.COLUMN_INDEX_TITLE).equals(title)) {
-                                            cv.put(Sections.COLUMN_TITLE, title);
+                                            cv.put(Accounts.COLUMN_TITLE, title);
                                         }
                                         if (!c.getString(Accounts.COLUMN_INDEX_MEMO).equals(memo)) {
-                                            cv.put(Sections.COLUMN_MEMO, memo);
+                                            cv.put(Accounts.COLUMN_MEMO, memo);
                                         }
                                         if (c.getInt(Accounts.COLUMN_INDEX_SORT_ORDER) != sortOrder) {
-                                            cv.put(Sections.COLUMN_SORT_ORDER, sortOrder);
+                                            cv.put(Accounts.COLUMN_SORT_ORDER, sortOrder);
                                         }
                                         if (cv.size() > 0) {
                                             operations.add(ContentProviderOperation.newUpdate(accountItemUri)

@@ -17,6 +17,9 @@ public class FrequentItems implements BaseColumns {
     public static final String COLUMN_LEFT_ACCOUNT_ID = "left_account_id";
     public static final String COLUMN_RIGHT_ACCOUNT_TYPE = "right_account_type";
     public static final String COLUMN_RIGHT_ACCOUNT_ID = "right_account_id";
+    public static final String COLUMN_USE_COUNT = "use_count";
+    public static final String COLUMN_LAST_USE_TIME = "last_use_time";
+    public static final String COLUMN_SORT_ORDER = "sort_order";
 
     public static final int COLUMN_INDEX_SLOT_NUMBER = 2;
     public static final int COLUMN_INDEX_ITEM_ID = 3;
@@ -26,6 +29,7 @@ public class FrequentItems implements BaseColumns {
     public static final int COLUMN_INDEX_LEFT_ACCOUNT_ID = 7;
     public static final int COLUMN_INDEX_RIGHT_ACCOUNT_TYPE = 8;
     public static final int COLUMN_INDEX_RIGHT_ACCOUNT_ID = 9;
+    public static final int COLUMN_INDEX_SORT_ORDER = 12;
 
     public static final String PREFIX_LEFT = "left";
     public static final String PREFIX_RIGHT = "right";
@@ -40,7 +44,10 @@ public class FrequentItems implements BaseColumns {
             TABLE_NAME + "." + COLUMN_LEFT_ACCOUNT_TYPE,
             TABLE_NAME + "." + COLUMN_LEFT_ACCOUNT_ID,
             TABLE_NAME + "." + COLUMN_RIGHT_ACCOUNT_TYPE,
-            TABLE_NAME + "." + COLUMN_RIGHT_ACCOUNT_ID
+            TABLE_NAME + "." + COLUMN_RIGHT_ACCOUNT_ID,
+            TABLE_NAME + "." + COLUMN_USE_COUNT,
+            TABLE_NAME + "." + COLUMN_LAST_USE_TIME,
+            TABLE_NAME + "." + COLUMN_SORT_ORDER
     };
 
     public static final String CREATE_TABLE_QUERY = "CREATE TABLE " + TABLE_NAME + "(" +
@@ -53,5 +60,11 @@ public class FrequentItems implements BaseColumns {
             COLUMN_LEFT_ACCOUNT_TYPE + " TEXT," +
             COLUMN_LEFT_ACCOUNT_ID + " TEXT," +
             COLUMN_RIGHT_ACCOUNT_TYPE + " TEXT," +
-            COLUMN_RIGHT_ACCOUNT_ID + " TEXT)";
+            COLUMN_RIGHT_ACCOUNT_ID + " TEXT," +
+            COLUMN_USE_COUNT + " INTEGER DEFAULT 0," +
+            COLUMN_LAST_USE_TIME + " INTEGER DEFAULT 0," +
+            COLUMN_SORT_ORDER + " INTEGER," +
+
+            "FOREIGN KEY(" + COLUMN_SECTION_ID + ") REFERENCES " +
+            Sections.TABLE_NAME + "(" + Sections.COLUMN_SECTION_ID + ") ON DELETE CASCADE)";
 }

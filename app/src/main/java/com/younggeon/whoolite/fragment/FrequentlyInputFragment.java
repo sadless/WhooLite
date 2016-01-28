@@ -1,14 +1,11 @@
 package com.younggeon.whoolite.fragment;
 
 import android.app.Activity;
-import android.content.ContentProviderOperation;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.RemoteException;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.content.Loader;
@@ -29,25 +26,18 @@ import com.android.volley.Request;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.activity.FrequentlyInputItemDetailActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
-import com.younggeon.whoolite.db.schema.FrequentItemUseCount;
 import com.younggeon.whoolite.db.schema.FrequentItems;
 import com.younggeon.whoolite.provider.WhooingProvider;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.EntriesLoader;
 import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 import java.util.ArrayList;
-import java.util.Iterator;
 
 /**
  * Created by sadless on 2016. 1. 17..
  */
 public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
-    private static final String URI_FREQUENT_ITEMS = "https://whooing.com/api/frequent_items.json_array";
-
     private static final int REQUEST_CODE_COMPLETE_FREQUENT_ITEM = 1;
 
     private static final String INSTANCE_STATE_PROGRESSING_ITEM_ID_BUNDLE = "progressing_item_id_bundle";
@@ -67,12 +57,11 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        mReceiveUri = Uri.parse(URI_FREQUENT_ITEMS);
         mReceiveFailedStringId = R.string.failed_to_receive_frequent_item;
         mNoDataStringId = R.string.no_frequent_items;
         mDeleteConfirmStringId = R.string.delete_frequent_items_confirm;
         mActionMenuId = R.menu.action_menu_frequently_input;
-        mMainDataSortOrder = FrequentItemUseCount.COLUMN_USE_COUNT + " DESC";
+        mMainDataSortOrder = FrequentItems.COLUMN_USE_COUNT + " DESC";
     }
 
     @Override
@@ -95,48 +84,6 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
         }
 
         return view;
-    }
-
-    @Override
-    protected void storeData(JSONObject result) {
-        JSONObject frequentItems = result.optJSONObject(WhooingKeyValues.RESULT);
-        Iterator<String> keys = frequentItems.keys();
-        int slotNumber = 1;
-        ArrayList<ContentProviderOperation> operations = new ArrayList<>();
-        Uri frequentItemUri = WhooingProvider.getFrequentItemsUri(mSectionId);
-
-        operations.add(ContentProviderOperation.newDelete(frequentItemUri).build());
-        while (keys.hasNext()) {
-            JSONArray itemsInSlot = frequentItems.optJSONArray(keys.next());
-
-            for (int i = 0; i < itemsInSlot.length(); i++) {
-                JSONObject item = itemsInSlot.optJSONObject(i);
-
-                operations.add(ContentProviderOperation.newInsert(frequentItemUri)
-                        .withValue(FrequentItems.COLUMN_SLOT_NUMBER, slotNumber)
-                        .withValue(FrequentItems.COLUMN_ITEM_ID,
-                                item.optString(WhooingKeyValues.ITEM_ID))
-                        .withValue(FrequentItems.COLUMN_TITLE,
-                                item.optString(WhooingKeyValues.ITEM_TITLE))
-                        .withValue(FrequentItems.COLUMN_MONEY,
-                                item.optDouble(WhooingKeyValues.MONEY))
-                        .withValue(FrequentItems.COLUMN_LEFT_ACCOUNT_TYPE,
-                                item.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE))
-                        .withValue(FrequentItems.COLUMN_LEFT_ACCOUNT_ID,
-                                item.optString(WhooingKeyValues.LEFT_ACCOUNT_ID))
-                        .withValue(FrequentItems.COLUMN_RIGHT_ACCOUNT_TYPE,
-                                item.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE))
-                        .withValue(FrequentItems.COLUMN_RIGHT_ACCOUNT_ID,
-                                item.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID)).build());
-            }
-            slotNumber++;
-        }
-        try {
-            getActivity().getContentResolver().applyBatch(getString(R.string.whooing_authority),
-                    operations);
-        } catch (RemoteException | OperationApplicationException | NullPointerException e) {
-            e.printStackTrace();
-        }
     }
 
     @Override
@@ -235,6 +182,15 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                 return new FrequentItemsLoader(getActivity(),
                         Request.Method.DELETE,
                         null);
+            }
+            case LOADER_ID_REFRESH_MAIN_DATA: {
+                Bundle bundle = new Bundle();
+
+                bundle.putString(WhooingKeyValues.SECTION_ID, mSectionId);
+
+                return new FrequentItemsLoader(getActivity(),
+                        Request.Method.GET,
+                        bundle);
             }
             default: {
                 if (id >= LOADER_ID_ENTRY_INPUT_START) {

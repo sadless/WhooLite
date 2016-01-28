@@ -1,14 +1,11 @@
 package com.younggeon.whoolite.fragment;
 
 import android.app.ProgressDialog;
-import android.content.ContentProviderOperation;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.RemoteException;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.content.Loader;
@@ -37,20 +34,14 @@ import com.younggeon.whoolite.whooing.loader.EntriesLoader;
 import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
 import com.younggeon.whoolite.whooing.loader.WhooingBaseLoader;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Locale;
 
 /**
  * Created by sadless on 2016. 1. 17..
  */
 public class HistoryFragment extends WhooLiteActivityBaseFragment {
-    private static final String URI_ENTRIES = "https://whooing.com/api/entries/latest.json";
-
     private static final int LOADER_ID_BOOKMARK_SELECTED_ITEMS = 1;
 
     private static final String INSTANCE_STATE_SHOW_SELECT_SLOT_NUMBER = "show_select_slot_number";
@@ -65,49 +56,10 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        mReceiveUri = Uri.parse(URI_ENTRIES);
         mReceiveFailedStringId = R.string.failed_to_receive_entries;
         mNoDataStringId = R.string.no_entries;
         mDeleteConfirmStringId = R.string.delete_entries_confirm;
         mActionMenuId = R.menu.action_menu_history;
-    }
-
-    @Override
-    protected void storeData(JSONObject result) {
-        JSONArray entries = result.optJSONArray(WhooingKeyValues.RESULT);
-        ArrayList<ContentProviderOperation> operations = new ArrayList<>();
-        Uri entriesUri = WhooingProvider.getEntriesUri(mSectionId);
-
-        operations.add(ContentProviderOperation.newDelete(entriesUri).build());
-        for (int i = 0; i < entries.length(); i++) {
-            JSONObject entry = entries.optJSONObject(i);
-
-            operations.add(ContentProviderOperation.newInsert(entriesUri)
-                    .withValue(Entries.COLUMN_ENTRY_ID,
-                            entry.optLong(WhooingKeyValues.ENTRY_ID))
-                    .withValue(Entries.COLUMN_TITLE,
-                            entry.optString(WhooingKeyValues.ITEM_TITLE))
-                    .withValue(Entries.COLUMN_MONEY,
-                            entry.optDouble(WhooingKeyValues.MONEY))
-                    .withValue(Entries.COLUMN_LEFT_ACCOUNT_TYPE,
-                            entry.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE))
-                    .withValue(Entries.COLUMN_LEFT_ACCOUNT_ID,
-                            entry.optString(WhooingKeyValues.LEFT_ACCOUNT_ID))
-                    .withValue(Entries.COLUMN_RIGHT_ACCOUNT_TYPE,
-                            entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE))
-                    .withValue(Entries.COLUMN_RIGHT_ACCOUNT_ID,
-                            entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID))
-                    .withValue(Entries.COLUMN_MEMO,
-                            entry.optString(WhooingKeyValues.MEMO))
-                    .withValue(Entries.COLUMN_ENTRY_DATE,
-                            entry.optDouble(WhooingKeyValues.ENTRY_DATE)).build());
-        }
-        try {
-            getActivity().getContentResolver().applyBatch(getString(R.string.whooing_authority),
-                    operations);
-        } catch (RemoteException | OperationApplicationException | NullPointerException e) {
-            e.printStackTrace();
-        }
     }
 
     @Override
@@ -166,6 +118,15 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                 return new FrequentItemsLoader(getActivity(),
                         Request.Method.POST,
                         null);
+            }
+            case LOADER_ID_REFRESH_MAIN_DATA: {
+                Bundle bundle = new Bundle();
+
+                bundle.putString(WhooingKeyValues.SECTION_ID, mSectionId);
+
+                return new EntriesLoader(getActivity(),
+                        Request.Method.GET,
+                        bundle);
             }
             default: {
                 return super.onCreateLoader(id, args);

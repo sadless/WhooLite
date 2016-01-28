@@ -90,10 +90,7 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
                     intent.putExtra(Actions.EXTRA_SECTION_ID, sectionId);
                     sendBroadcast(intent);
                 }
-                Bundle args = new Bundle();
-
-                args.putString(WhooingKeyValues.SECTION_ID, mCurrentSectionId);
-                getSupportLoaderManager().restartLoader(LOADER_ID_REFRESH_ACCOUNTS, args, WhooLiteActivity.this).forceLoad();
+                getSupportLoaderManager().restartLoader(LOADER_ID_REFRESH_ACCOUNTS, null, WhooLiteActivity.this).forceLoad();
             }
 
             @Override
@@ -121,12 +118,6 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
             }
         });
         getSupportLoaderManager().initLoader(LOADER_ID_SECTIONS, null, this);
-        if (getSupportLoaderManager().getLoader(LOADER_ID_REFRESH_SECTIONS) != null) {
-            getSupportLoaderManager().initLoader(LOADER_ID_REFRESH_SECTIONS, null, this);
-        }
-        if (getSupportLoaderManager().getLoader(LOADER_ID_REFRESH_ACCOUNTS) != null) {
-            getSupportLoaderManager().initLoader(LOADER_ID_REFRESH_ACCOUNTS, null, this);
-        }
 
         TabLayout tabLayout = (TabLayout) findViewById(R.id.tab);
         ViewPager pager = (ViewPager) findViewById(R.id.pager);
@@ -145,10 +136,7 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
             getSupportLoaderManager().initLoader(LOADER_ID_REFRESH_SECTIONS, null, this).forceLoad();
         }
         if (mCurrentSectionId != null && getSupportLoaderManager().getLoader(LOADER_ID_REFRESH_ACCOUNTS) == null) {
-            Bundle args = new Bundle();
-
-            args.putString(WhooingKeyValues.SECTION_ID, mCurrentSectionId);
-            getSupportLoaderManager().initLoader(LOADER_ID_REFRESH_ACCOUNTS, args, this).forceLoad();
+            getSupportLoaderManager().initLoader(LOADER_ID_REFRESH_ACCOUNTS, null, this).forceLoad();
         }
     }
 
@@ -189,9 +177,12 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
                         null);
             }
             case LOADER_ID_REFRESH_ACCOUNTS: {
+                Bundle bundle = new Bundle();
+
+                bundle.putString(WhooingKeyValues.SECTION_ID, mCurrentSectionId);
                 return new AccountsLoader(this,
                         Request.Method.GET,
-                        args);
+                        bundle);
             }
             default: {
                 return null;
