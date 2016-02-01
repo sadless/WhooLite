@@ -1,6 +1,8 @@
 package com.younggeon.whoolite.fragment;
 
 import android.app.Activity;
+import android.app.SearchManager;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
@@ -8,13 +10,18 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
+import android.support.v4.content.AsyncTaskLoader;
 import android.support.v4.content.Loader;
+import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.view.ActionMode;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.SearchView;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
@@ -28,6 +35,7 @@ import com.younggeon.whoolite.activity.FrequentlyInputItemDetailActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.FrequentItems;
 import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.util.SoundSearcher;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.EntriesLoader;
 import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
@@ -44,7 +52,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
     private static final String INSTANCE_STATE_LAST_LOADER_ID = "last_loader_id";
     private static final String INSTANCE_STATE_PROGRESSING_LOADER_IDS = "progressing_loader_id";
     private static final String INSTANCE_STATE_MULTI_INPUT_ARGS = "multi_input_args";
+    private static final String INSTANCE_STATE_QUERY_TEXT = "query_text";
 
+    private static final int LOADER_ID_QUERY = 1;
     private static final int LOADER_ID_ENTRY_INPUT_START = 10000;
 
     private ArrayList<String> mCurrentProgressingItemIds;
@@ -52,6 +62,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
     private int mLastLoaderId;
     private ArrayList<Bundle> mMultiInputArgs;
     private Bundle mProgressingItemIdBundle;
+    private String mQueryText;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -63,6 +74,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
         mActionMenuId = R.menu.action_menu_frequently_input;
         mMainDataSortOrder = FrequentItems.COLUMN_SLOT_NUMBER + " ASC, " +
                 FrequentItems.COLUMN_USE_COUNT + " DESC";
+        setHasOptionsMenu(true);
     }
 
     @Override
@@ -72,6 +84,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
             mLastLoaderId = savedInstanceState.getInt(INSTANCE_STATE_LAST_LOADER_ID);
             mProgressingLoaderIds = savedInstanceState.getIntegerArrayList(INSTANCE_STATE_PROGRESSING_LOADER_IDS);
             mMultiInputArgs = savedInstanceState.getParcelableArrayList(INSTANCE_STATE_MULTI_INPUT_ARGS);
+            mQueryText = savedInstanceState.getString(INSTANCE_STATE_QUERY_TEXT);
         } else {
             mProgressingItemIdBundle = new Bundle();
             mLastLoaderId = LOADER_ID_ENTRY_INPUT_START;
@@ -82,6 +95,12 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
 
         for (int id : mProgressingLoaderIds) {
             getLoaderManager().initLoader(id, null, this);
+        }
+        getLoaderManager().initLoader(LOADER_ID_QUERY, null, this);
+        if (!TextUtils.isEmpty(mQueryText)) {
+            mProgressBar.setVisibility(View.GONE);
+            mEmptyText.setText(R.string.no_search_result);
+            mEmptyText.setVisibility(View.VISIBLE);
         }
 
         return view;
@@ -118,6 +137,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
         outState.putInt(INSTANCE_STATE_LAST_LOADER_ID, mLastLoaderId);
         outState.putIntegerArrayList(INSTANCE_STATE_PROGRESSING_LOADER_IDS, mProgressingLoaderIds);
         outState.putParcelableArrayList(INSTANCE_STATE_MULTI_INPUT_ARGS, mMultiInputArgs);
+        outState.putString(INSTANCE_STATE_QUERY_TEXT, mQueryText);
     }
 
     @Override
@@ -177,6 +197,52 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
     }
 
     @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+
+        inflater.inflate(R.menu.menu_frequently_input, menu);
+
+        SearchManager searchManager = (SearchManager) getActivity().getSystemService(Context.SEARCH_SERVICE);
+        MenuItem searchMenu = menu.findItem(R.id.action_search);
+        SearchView searchView = (SearchView) MenuItemCompat.getActionView(searchMenu);
+
+        searchView.setSearchableInfo(searchManager.getSearchableInfo(getActivity().getComponentName()));
+        if (!TextUtils.isEmpty(mQueryText)) {
+            MenuItemCompat.expandActionView(searchMenu);
+            searchView.setQuery(mQueryText, false);
+        }
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                mQueryText = newText;
+                if (!TextUtils.isEmpty(newText)) {
+                    QueryLoader loader = QueryLoader.castLoader(
+                            getLoaderManager().restartLoader(LOADER_ID_QUERY, null, FrequentlyInputFragment.this));
+
+                    loader.sectionId = mSectionId;
+                    loader.sortOrder = mMainDataSortOrder;
+                    loader.keyword = newText;
+                    loader.forceLoad();
+                    mEmptyText.setText(R.string.no_search_result);
+                    mRetryButton.setVisibility(View.GONE);
+                } else {
+                    mMainDataWhere = null;
+                    getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, FrequentlyInputFragment.this);
+                    mEmptyText.setText(mNoDataStringId);
+                    mRetryButton.setVisibility(View.VISIBLE);
+                }
+
+                return false;
+            }
+        });
+    }
+
+    @Override
     public Loader onCreateLoader(int id, Bundle args) {
         switch (id) {
             case LOADER_ID_DELETE_SELECTED_ITEMS: {
@@ -193,6 +259,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                         Request.Method.GET,
                         bundle);
             }
+            case LOADER_ID_QUERY: {
+                return new QueryLoader(getActivity());
+            }
             default: {
                 if (id >= LOADER_ID_ENTRY_INPUT_START) {
                     return new EntriesLoader(getActivity(), Request.Method.POST, args);
@@ -206,6 +275,23 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
     @Override
     public void onLoadFinished(Loader loader, Object data) {
         switch (loader.getId()) {
+            case LOADER_ID_QUERY: {
+                if (!TextUtils.isEmpty(mQueryText)) {
+                    mMainDataWhere = FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_TITLE + " IN " + data;
+                    getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, this);
+                }
+                break;
+            }
+            case LOADER_ID_REFRESH_MAIN_DATA: {
+                super.onLoadFinished(loader, data);
+                if (!TextUtils.isEmpty(mQueryText)) {
+                    mEmptyText.setText(R.string.no_search_result);
+                    mEmptyText.setVisibility(View.VISIBLE);
+                    mProgressBar.setVisibility(View.GONE);
+                    mRetryButton.setVisibility(View.GONE);
+                }
+                break;
+            }
             default: {
                 if (loader.getId() >= LOADER_ID_ENTRY_INPUT_START) {
                     int resultCode = (Integer) data;
@@ -319,8 +405,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                 String selectionId = mSelectedItems.remove(0);
                 String[] slotNumberAndId = selectionId.split(":");
                 Cursor c = getActivity().getContentResolver().query(WhooingProvider.getFrequentItemUri(mSectionId,
-                        Integer.parseInt(slotNumberAndId[0]),
-                        slotNumberAndId[1]),
+                                Integer.parseInt(slotNumberAndId[0]),
+                                slotNumberAndId[1]),
                         null,
                         null,
                         null,
@@ -536,6 +622,53 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                     break;
                 }
             }
+        }
+    }
+
+    private static class QueryLoader extends AsyncTaskLoader<String> {
+        public String sectionId;
+        public String sortOrder;
+        public String keyword;
+
+        public QueryLoader(Context context) {
+            super(context);
+        }
+
+        @Override
+        public String loadInBackground() {
+            Cursor c = getContext().getContentResolver().query(WhooingProvider.getFrequentItemsUri(sectionId),
+                    null,
+                    null,
+                    null,
+                    sortOrder);
+            String retVal = "(";
+            boolean isFirst = true;
+
+            if (c != null) {
+                if (c.moveToFirst()) {
+                    do {
+                        String originalTitle = c.getString(FrequentItems.COLUMN_INDEX_TITLE);
+                        String trimmedTitle = originalTitle.replaceAll("\\s", "");
+
+                        if (SoundSearcher.matchString(trimmedTitle, keyword)) {
+                            if (isFirst) {
+                                retVal += "'" + originalTitle + "'";
+                                isFirst = false;
+                            } else {
+                                retVal += ",'" + originalTitle + "'";
+                            }
+                        }
+                    } while (c.moveToNext());
+                }
+                c.close();
+            }
+            retVal += ")";
+
+            return retVal;
+        }
+
+        public static QueryLoader castLoader(Loader loader) {
+            return (QueryLoader) loader;
         }
     }
 }

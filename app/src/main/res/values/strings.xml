@@ -83,4 +83,7 @@
     <string name="edit_failed">수정 실패</string>
     <string name="edit_entry_failed">거래내역을 수정하지 못했습니다. 네트워크 상태를 확인하시고 다시 시도해주세요.</string>
     <string name="action_logout">로그아웃</string>
+    <string name="action_search">검색</string>
+    <string name="action_search_hint">자주입력 거래들 검색</string>
+    <string name="no_search_result">검색결과가 없습니다.</string>
 </resources>

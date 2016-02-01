@@ -76,16 +76,16 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     protected ArrayList<String> mSelectedItems;
     protected String mProgressTitle;
     protected String mMainDataSortOrder;
+    protected String mMainDataWhere;
 
     protected ActionMode mActionMode;
     protected RecyclerView mRecyclerView;
+    protected Button mRetryButton;
+    protected TextView mEmptyText;
+    protected ProgressBar mProgressBar;
+
     protected ProgressDialog mProgressDialog;
-
     private Currency mCurrency;
-
-    private Button mRetryButton;
-    private TextView mEmptyText;
-    private ProgressBar mProgressBar;
     private LinearLayout mEmptyLayout;
     private AlertDialog mDeleteConfirmDialog;
 
@@ -192,7 +192,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 return new CursorLoader(getActivity(),
                         getMainDataUri(),
                         null,
-                        null,
+                        mMainDataWhere,
                         null,
                         mMainDataSortOrder);
             }
@@ -321,6 +321,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     @Override
     public void onDestroyActionMode(ActionMode mode) {
         mActionMode = null;
+        mSelectedItems = null;
         mRecyclerView.getAdapter().notifyDataSetChanged();
     }
 
