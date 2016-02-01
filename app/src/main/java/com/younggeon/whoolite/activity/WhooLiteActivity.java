@@ -166,7 +166,7 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
             case LOADER_ID_SECTIONS: {
                 return new CursorLoader(this,
                         WhooingProvider.getSectionsUri(),
-                        null,
+                        Sections.PROJECTION_FOR_CURSOR_ADAPTER,
                         null,
                         null,
                         Sections.COLUMN_SORT_ORDER + " ASC");

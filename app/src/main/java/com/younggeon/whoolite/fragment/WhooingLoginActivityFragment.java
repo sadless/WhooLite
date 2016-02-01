@@ -41,7 +41,6 @@ import java.util.concurrent.TimeoutException;
 /**
  * Created by sadless on 2015. 9. 23..
  */
-@SuppressWarnings("unchecked")
 public class WhooingLoginActivityFragment extends Fragment implements LoaderManager.LoaderCallbacks<JSONObject> {
     private static final int LOADER_ID_REQUEST_TOKEN = 1;
     private static final int LOADER_ID_REQUEST_ACCESS_TOKEN = 2;
@@ -179,7 +178,7 @@ public class WhooingLoginActivityFragment extends Fragment implements LoaderMana
                             WhooingKeyValues.TOKEN + "=" + data.optString(WhooingKeyValues.TOKEN) + "," +
                             WhooingKeyValues.SIGNATURE + "=" + sha1(BuildConfig.WHOOING_APP_SECRET + "|" +
                             data.optString(WhooingKeyValues.TOKEN_SECRET)) + "," +
-                            WhooingKeyValues.NOUNS + "=" + getContext().getString(R.string.app_name) + "," +
+                            WhooingKeyValues.NONCE + "=" + getContext().getString(R.string.app_name) + "," +
                             WhooingKeyValues.TIMESTAMP + "=%d";
 
                     intent.putExtra(WhooingLoginActivity.EXTRA_API_KEY_FORMAT, apiKeyFormat);

@@ -239,6 +239,7 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                         args.putString(WhooingKeyValues.RIGHT_ACCOUNT_ID, mRightAccountId);
                         args.putString(WhooingKeyValues.ITEM_TITLE, mTitle.getText().toString());
                         args.putString(WhooingKeyValues.MONEY, mMoney.getText().toString());
+                        args.putString(WhooingKeyValues.MEMO, mMemo.getText().toString());
                         loader.args = args;
                         loader.forceLoad();
                     }

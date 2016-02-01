@@ -16,6 +16,19 @@ public class WhooingOpenHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "whooing";
     private static final int VERSION = 1;
 
+    private static final String CREATE_SECTION_DELETE_TRIGGER_QUERY = "CREATE TRIGGER section_delete_trigger " +
+            "AFTER DELETE ON " + Sections.TABLE_NAME + " BEGIN " +
+            "DELETE FROM " + FrequentItems.TABLE_NAME + " WHERE " +
+            FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_SECTION_ID + " = " +
+            "OLD." + Sections.COLUMN_SECTION_ID + ";" +
+            "DELETE FROM " + Accounts.TABLE_NAME + " WHERE " +
+            Accounts.TABLE_NAME + "." + Accounts.COLUMN_SECTION_ID + " = " +
+            "OLD." + Sections.COLUMN_SECTION_ID + ";" +
+            "DELETE FROM " + Entries.TABLE_NAME + " WHERE " +
+            Entries.TABLE_NAME + "." + Entries.COLUMN_SECTION_ID + " = " +
+            "OLD." + Sections.COLUMN_SECTION_ID + ";" +
+            "END";
+
     public WhooingOpenHelper(Context context) {
         super(context, DB_NAME, null, VERSION);
     }
@@ -23,9 +36,10 @@ public class WhooingOpenHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL(Sections.CREATE_TABLE_QUERY);
-        db.execSQL(FrequentItems.CREATE_TABLE_QUERY);
         db.execSQL(Accounts.CREATE_TABLE_QUERY);
+        db.execSQL(FrequentItems.CREATE_TABLE_QUERY);
         db.execSQL(Entries.CREATE_TABLE_QUERY);
+        db.execSQL(CREATE_SECTION_DELETE_TRIGGER_QUERY);
     }
 
     @Override

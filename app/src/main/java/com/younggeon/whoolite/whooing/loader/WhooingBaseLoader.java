@@ -13,7 +13,7 @@ import com.younggeon.whoolite.constant.PreferenceKeys;
  * Created by sadless on 2016. 1. 17..
  */
 public abstract class WhooingBaseLoader extends AsyncTaskLoader<Integer> {
-    public static final String ARG_CURSOR_INDEX = "cursor_index";
+    public static final String ARG_SELECTED_ITEMS = "selected_items";
 
     public Bundle args;
 

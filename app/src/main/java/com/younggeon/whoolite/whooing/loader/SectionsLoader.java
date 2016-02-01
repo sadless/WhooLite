@@ -1,19 +1,14 @@
 package com.younggeon.whoolite.whooing.loader;
 
-import android.content.ContentProviderOperation;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.OperationApplicationException;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.RemoteException;
 import android.preference.PreferenceManager;
 
 import com.android.volley.Request;
 import com.android.volley.toolbox.RequestFuture;
-import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
@@ -24,7 +19,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -86,80 +80,24 @@ public class SectionsLoader extends WhooingBaseLoader {
                     JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
 
                     if ((resultCode = result.optInt(WhooingKeyValues.CODE)) == WhooingKeyValues.SUCCESS) {
-                        ArrayList<ContentProviderOperation> operations = new ArrayList<>();
                         JSONArray sections = result.optJSONArray(WhooingKeyValues.RESULT);
-                        String ids = null;
-                        Uri sectionsUri = WhooingProvider.getSectionsUri();
+                        ContentValues[] values = new ContentValues[sections.length()];
 
                         for (int i = 0; i < sections.length(); i++) {
                             JSONObject section = sections.optJSONObject(i);
-                            String sectionId = section.optString(WhooingKeyValues.SECTION_ID);
-                            Uri sectionItemUri = WhooingProvider.getSectionUri(sectionId);
-                            Cursor c = getContext().getContentResolver().query(
-                                    sectionItemUri,
-                                    null,
-                                    null,
-                                    null,
-                                    null);
 
-                            if (c != null) {
-                                ContentValues cv = new ContentValues();
-                                String title = section.optString(WhooingKeyValues.TITLE);
-                                String memo = section.optString(WhooingKeyValues.MEMO);
-                                String currency = section.optString(WhooingKeyValues.CURRENCY);
-                                String dateFormat = section.optString(WhooingKeyValues.DATE_FORMAT);
-
-                                if (c.moveToFirst()) {
-                                    if (!c.getString(Sections.COLUMN_INDEX_TITLE).equals(title)) {
-                                        cv.put(Sections.COLUMN_TITLE, title);
-                                    }
-                                    if (!c.getString(Sections.COLUMN_INDEX_MEMO).equals(memo)) {
-                                        cv.put(Sections.COLUMN_MEMO, memo);
-                                    }
-                                    if (!c.getString(Sections.COLUMN_INDEX_CURRENCY).equals(currency)) {
-                                        cv.put(Sections.COLUMN_CURRENCY, currency);
-                                    }
-                                    if (!c.getString(Sections.COLUMN_INDEX_DATE_FORMAT).equals(dateFormat)) {
-                                        cv.put(Sections.COLUMN_DATE_FORMAT, dateFormat);
-                                    }
-                                    if (c.getInt(Sections.COLUMN_INDEX_SORT_ORDER) != i) {
-                                        cv.put(Sections.COLUMN_SORT_ORDER, i);
-                                    }
-                                    if (cv.size() > 0) {
-                                        operations.add(ContentProviderOperation.newUpdate(sectionItemUri)
-                                            .withValues(cv).build());
-                                    }
-                                } else {
-                                    cv.put(Sections.COLUMN_SECTION_ID, sectionId);
-                                    cv.put(Sections.COLUMN_TITLE, title);
-                                    cv.put(Sections.COLUMN_MEMO, memo);
-                                    cv.put(Sections.COLUMN_CURRENCY, currency);
-                                    cv.put(Sections.COLUMN_DATE_FORMAT, dateFormat);
-                                    cv.put(Sections.COLUMN_SORT_ORDER, i);
-                                    operations.add(ContentProviderOperation.newInsert(sectionsUri)
-                                        .withValues(cv).build());
-                                }
-                                c.close();
-                            }
-                            if (ids == null) {
-                                ids = "('" + sectionId + "'";
-                            } else {
-                                ids += ",'" + sectionId + "'";
-                            }
+                            values[i] = new ContentValues();
+                            values[i].put(Sections.COLUMN_SECTION_ID, section.optString(WhooingKeyValues.SECTION_ID));
+                            values[i].put(Sections.COLUMN_TITLE, section.optString(WhooingKeyValues.TITLE));
+                            values[i].put(Sections.COLUMN_MEMO, section.optString(WhooingKeyValues.MEMO));
+                            values[i].put(Sections.COLUMN_CURRENCY, section.optString(WhooingKeyValues.CURRENCY));
+                            values[i].put(Sections.COLUMN_DATE_FORMAT, section.optString(WhooingKeyValues.DATE_FORMAT));
+                            values[i].put(Sections.COLUMN_SORT_ORDER, i);
                         }
-                        if (ids != null) {
-                            ids += ")";
-                            operations.add(ContentProviderOperation.newDelete(sectionsUri)
-                                    .withSelection(Sections.COLUMN_SECTION_ID + " NOT IN " + ids, null)
-                                    .build());
-                        }
-                        if (operations.size() > 0) {
-                            getContext().getContentResolver().applyBatch(getContext().getString(R.string.whooing_authority),
-                                    operations);
-                        }
+                        getContext().getContentResolver().bulkInsert(WhooingProvider.getSectionsUri(),
+                                values);
                     }
-                } catch (JSONException | InterruptedException | ExecutionException | TimeoutException |
-                        RemoteException | OperationApplicationException e) {
+                } catch (JSONException | InterruptedException | ExecutionException | TimeoutException e) {
                     e.printStackTrace();
 
                     resultCode = -1;

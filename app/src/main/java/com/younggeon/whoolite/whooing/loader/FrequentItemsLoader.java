@@ -1,18 +1,15 @@
 package com.younggeon.whoolite.whooing.loader;
 
-import android.content.ContentProviderOperation;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.RemoteException;
 import android.support.v4.content.Loader;
+import android.text.TextUtils;
 
 import com.android.volley.Request;
 import com.android.volley.toolbox.RequestFuture;
-import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.Entries;
@@ -39,6 +36,9 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
     public static final String ARG_OLD_SLOT = "old_slot";
     public static final String ARG_NEW_SLOT = "new_slot";
 
+    private int mUseCount;
+    private long mLastUseTime;
+
     public FrequentItemsLoader(Context context, int method, Bundle args) {
         super(context, method, args);
     }
@@ -48,32 +48,21 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
         switch (mMethod) {
             case Request.Method.DELETE: {
                 String sectionId = args.getString(WhooingKeyValues.SECTION_ID);
-                int[] cursorIndex = args.getIntArray(ARG_CURSOR_INDEX);
+                ArrayList<String> selectedItems = args.getStringArrayList(ARG_SELECTED_ITEMS);
 
-                if (cursorIndex == null) {
+                if (selectedItems == null) {
                     int slotNumber = args.getInt(FrequentItems.COLUMN_SLOT_NUMBER);
                     String itemId = args.getString(WhooingKeyValues.ITEM_ID);
 
                     return deleteFrequentItem(sectionId, slotNumber, itemId);
                 } else {
-                    Cursor c = getContext().getContentResolver().query(WhooingProvider.getFrequentItemsUri(sectionId),
-                            null,
-                            null,
-                            null,
-                            null);
+                    HashMap<String, ArrayList<String>> slotItemIdsMap = new HashMap<>();
+                    HashMap<String, ArrayList<Integer>> slotIndexMap = new HashMap<>();
 
-                    if (c == null) {
-                        return -1;
-                    }
-
-                    HashMap<Integer, ArrayList<String>> slotItemIdsMap = new HashMap<>();
-                    HashMap<Integer, ArrayList<Integer>> slotIndexMap = new HashMap<>();
-
-                    for (int i = 0; i < cursorIndex.length; i++) {
-                        if (cursorIndex[i] >= 0) {
-                            c.moveToPosition(cursorIndex[i]);
-
-                            int slotNumber = c.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER);
+                    for (int i = 0; i < selectedItems.size(); i++) {
+                        if (!TextUtils.isEmpty(selectedItems.get(i))) {
+                            String[] slotNumberAndItemId = selectedItems.get(i).split(":");
+                            String slotNumber = slotNumberAndItemId[0];
                             ArrayList<String> itemIds = slotItemIdsMap.get(slotNumber);
                             ArrayList<Integer> index = slotIndexMap.get(slotNumber);
 
@@ -83,15 +72,14 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                                 slotItemIdsMap.put(slotNumber, itemIds);
                                 slotIndexMap.put(slotNumber, index);
                             }
-                            itemIds.add(c.getString(FrequentItems.COLUMN_INDEX_ITEM_ID));
+                            itemIds.add(slotNumberAndItemId[1]);
                             index.add(i);
                         }
                     }
-                    c.close();
 
                     int resultCode = -1;
 
-                    for (int slotNumber : slotItemIdsMap.keySet()) {
+                    for (String slotNumber : slotItemIdsMap.keySet()) {
                         ArrayList<String> itemIds = slotItemIdsMap.get(slotNumber);
                         Uri.Builder builder = Uri.parse(URI_FREQUENT_ITEMS).buildUpon();
                         String itemIdsPath = itemIds.get(0);
@@ -124,9 +112,9 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                                                 FrequentItems.COLUMN_SLOT_NUMBER + " = ?",
                                         new String[]{"" + slotNumber});
                                 for (int i : index) {
-                                    cursorIndex[i] = -1;
+                                    selectedItems.set(i, "");
                                 }
-                                args.putIntArray(ARG_CURSOR_INDEX, cursorIndex);
+                                args.putStringArrayList(ARG_SELECTED_ITEMS, selectedItems);
                             }
                         } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
                             e.printStackTrace();
@@ -140,29 +128,28 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
             }
             case Request.Method.POST: {
                 String sectionId = args.getString(WhooingKeyValues.SECTION_ID);
-                int[] cursorIndex = args.getIntArray(ARG_CURSOR_INDEX);
+                ArrayList<String> selectedItems = args.getStringArrayList(ARG_SELECTED_ITEMS);
                 int slotNumber = args.getInt(FrequentItems.COLUMN_SLOT_NUMBER);
                 int resultCode = -1;
 
-                if (cursorIndex == null) {
+                if (selectedItems == null) {
                     args.remove(FrequentItems.COLUMN_SLOT_NUMBER);
                     resultCode = postFrequentItem((Bundle) args.clone(), slotNumber);
                     args.putInt(FrequentItems.COLUMN_SLOT_NUMBER, slotNumber);
 
                     return resultCode;
                 } else {
-                    Cursor c = getContext().getContentResolver().query(WhooingProvider.getEntriesUri(sectionId),
-                            null,
-                            null,
-                            null,
-                            null);
-                    Bundle args = new Bundle();
+                    for (String entryId : selectedItems) {
+                        Cursor c = getContext().getContentResolver().query(WhooingProvider.getEntryItemUri(sectionId, Long.parseLong(entryId)),
+                                null,
+                                null,
+                                null,
+                                null);
 
-                    if (c == null) {
-                        return -1;
-                    }
-                    for (int position : cursorIndex) {
-                        c.moveToPosition(position);
+                        if (c == null) {
+                            continue;
+                        }
+                        c.moveToFirst();
                         args.clear();
                         args.putString(WhooingKeyValues.SECTION_ID, sectionId);
                         args.putString(WhooingKeyValues.ITEM_TITLE, c.getString(Entries.COLUMN_INDEX_TITLE));
@@ -177,8 +164,8 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                                 c.getString(Entries.COLUMN_INDEX_RIGHT_ACCOUNT_ID));
                         resultCode = postFrequentItem(args, slotNumber);
                         mRequestFuture = RequestFuture.newFuture();
+                        c.close();
                     }
-                    c.close();
 
                     return resultCode;
                 }
@@ -263,104 +250,40 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                     JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
 
                     if ((resultCode = result.optInt(WhooingKeyValues.CODE)) == WhooingKeyValues.SUCCESS) {
-                        ArrayList<ContentProviderOperation> operations = new ArrayList<>();
                         JSONObject frequentItems = result.optJSONObject(WhooingKeyValues.RESULT);
                         Iterator<String> keys = frequentItems.keys();
-                        Uri frequentItemsUri = WhooingProvider.getFrequentItemsUri(sectionId);
                         int sortOrder = 0;
                         int slotNumber = 1;
+                        ArrayList<ContentValues> values = new ArrayList<>();
 
                         while (keys.hasNext()) {
                             JSONArray itemsInSlot = frequentItems.optJSONArray(keys.next());
-                            String ids = null;
 
                             for (int i = 0; i < itemsInSlot.length(); i++, sortOrder++) {
                                 JSONObject frequentItem = itemsInSlot.optJSONObject(i);
-                                String itemId = frequentItem.optString(WhooingKeyValues.ITEM_ID);
-                                Uri frequentItemUri = WhooingProvider.getFrequentItemUri(sectionId,
-                                        slotNumber,
-                                        itemId);
-                                Cursor c = getContext().getContentResolver().query(
-                                        frequentItemUri,
-                                        null,
-                                        null,
-                                        null,
-                                        null);
+                                ContentValues cv = new ContentValues();
 
-                                if (c != null) {
-                                    ContentValues cv = new ContentValues();
-                                    String title = frequentItem.optString(WhooingKeyValues.ITEM_TITLE);
-                                    double money = frequentItem.optDouble(WhooingKeyValues.MONEY);
-                                    String leftAccountType = frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE);
-                                    String leftAccountId = frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_ID);
-                                    String rightAccountType = frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE);
-                                    String rightAccountId = frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID);
-
-                                    if (c.moveToFirst()) {
-                                        if (!c.getString(FrequentItems.COLUMN_INDEX_TITLE).equals(title)) {
-                                            cv.put(FrequentItems.COLUMN_TITLE, title);
-                                        }
-                                        if (Math.abs(c.getDouble(FrequentItems.COLUMN_INDEX_MONEY) - money) > WhooingKeyValues.EPSILON) {
-                                            cv.put(FrequentItems.COLUMN_MONEY, money);
-                                        }
-                                        if (!c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE).equals(leftAccountType)) {
-                                            cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_TYPE, leftAccountType);
-                                        }
-                                        if (!c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID).equals(leftAccountId)) {
-                                            cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_ID, leftAccountId);
-                                        }
-                                        if (!c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE).equals(rightAccountType)) {
-                                            cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_TYPE, rightAccountType);
-                                        }
-                                        if (!c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID).equals(rightAccountId)) {
-                                            cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_ID, rightAccountId);
-                                        }
-                                        if (c.getInt(FrequentItems.COLUMN_INDEX_SORT_ORDER) != sortOrder) {
-                                            cv.put(FrequentItems.COLUMN_SORT_ORDER, sortOrder);
-                                        }
-                                        if (cv.size() > 0) {
-                                            operations.add(ContentProviderOperation.newUpdate(frequentItemUri)
-                                                    .withValues(cv).build());
-                                        }
-                                    } else {
-                                        cv.put(FrequentItems.COLUMN_SLOT_NUMBER, slotNumber);
-                                        cv.put(FrequentItems.COLUMN_ITEM_ID, itemId);
-                                        cv.put(FrequentItems.COLUMN_TITLE, title);
-                                        cv.put(FrequentItems.COLUMN_MONEY, money);
-                                        cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_TYPE, leftAccountType);
-                                        cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_ID, leftAccountId);
-                                        cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_TYPE, rightAccountType);
-                                        cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_ID, rightAccountId);
-                                        cv.put(FrequentItems.COLUMN_SORT_ORDER, sortOrder);
-                                        operations.add(ContentProviderOperation.newInsert(frequentItemsUri)
-                                                .withValues(cv).build());
-                                    }
-                                    c.close();
-                                }
-                                if (ids == null) {
-                                    ids = "('" + itemId + "'";
-                                } else {
-                                    ids += ",'" + itemId + "'";
-                                }
-                            }
-                            if (ids != null) {
-                                ids += ")";
-                                operations.add(ContentProviderOperation.newDelete(frequentItemsUri)
-                                        .withSelection(FrequentItems.COLUMN_SECTION_ID + " = ? AND " +
-                                                        FrequentItems.COLUMN_SLOT_NUMBER + " = ? AND " +
-                                                        FrequentItems.COLUMN_ITEM_ID + " NOT IN " + ids,
-                                                new String[]{sectionId, "" + slotNumber})
-                                        .build());
+                                cv.put(FrequentItems.COLUMN_SLOT_NUMBER, slotNumber);
+                                cv.put(FrequentItems.COLUMN_ITEM_ID, frequentItem.optString(WhooingKeyValues.ITEM_ID));
+                                cv.put(FrequentItems.COLUMN_TITLE, frequentItem.optString(WhooingKeyValues.ITEM_TITLE));
+                                cv.put(FrequentItems.COLUMN_MONEY, frequentItem.optDouble(WhooingKeyValues.MONEY));
+                                cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_TYPE, frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
+                                cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_ID, frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
+                                cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_TYPE, frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
+                                cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_ID, frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
+                                cv.put(FrequentItems.COLUMN_SORT_ORDER, sortOrder);
+                                values.add(cv);
+                                sortOrder++;
                             }
                             slotNumber++;
                         }
-                        if (operations.size() > 0) {
-                            getContext().getContentResolver().applyBatch(getContext().getString(R.string.whooing_authority),
-                                    operations);
-                        }
+
+                        ContentValues[] valuesArray = new ContentValues[values.size()];
+
+                        getContext().getContentResolver().bulkInsert(WhooingProvider.getFrequentItemsUri(sectionId),
+                                values.toArray(valuesArray));
                     }
-                } catch (InterruptedException | ExecutionException | TimeoutException | JSONException |
-                        RemoteException | OperationApplicationException e) {
+                } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
                     e.printStackTrace();
 
                     resultCode = -1;
@@ -384,6 +307,25 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
         Uri.Builder builder = Uri.parse(URI_FREQUENT_ITEMS).buildUpon();
         int resultCode;
 
+        if (mMethod == Request.Method.PUT) {
+            Cursor c = getContext().getContentResolver().query(WhooingProvider.getFrequentItemUri(sectionId,
+                    slotNumber,
+                    itemId),
+                    new String[]{FrequentItems.COLUMN_USE_COUNT, FrequentItems.COLUMN_LAST_USE_TIME},
+                    null,
+                    null,
+                    null);
+
+            if (c != null) {
+                c.moveToFirst();
+                mUseCount = c.getInt(0);
+                mLastUseTime = c.getLong(1);
+                c.close();
+            } else {
+                mUseCount = 0;
+                mLastUseTime = 0;
+            }
+        }
         builder.appendPath("slot" + slotNumber)
                 .appendPath(itemId)
                 .appendPath(sectionId + ".json");
@@ -443,6 +385,10 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                             resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
                     cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_ID,
                             resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
+                    if (mMethod == Request.Method.PUT) {
+                        cv.put(FrequentItems.COLUMN_USE_COUNT, mUseCount);
+                        cv.put(FrequentItems.COLUMN_LAST_USE_TIME, mLastUseTime);
+                    }
                     getContext().getContentResolver().insert(WhooingProvider.getFrequentItemsUri(
                                     args.getString(WhooingKeyValues.SECTION_ID)),
                             cv);

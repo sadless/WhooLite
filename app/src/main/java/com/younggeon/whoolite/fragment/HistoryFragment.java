@@ -60,6 +60,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         mNoDataStringId = R.string.no_entries;
         mDeleteConfirmStringId = R.string.delete_entries_confirm;
         mActionMenuId = R.menu.action_menu_history;
+        mMainDataSortOrder = Entries.COLUMN_ENTRY_DATE + " DESC";
     }
 
     @Override
@@ -154,8 +155,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                             .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface dialog, int which) {
-                                    startBookmarkLoader(finalLoader.args.getIntArray(WhooingBaseLoader.ARG_CURSOR_INDEX),
-                                            finalLoader.args.getInt(FrequentItems.COLUMN_SLOT_NUMBER));
+                                    startBookmarkLoader(finalLoader.args.getInt(FrequentItems.COLUMN_SLOT_NUMBER));
                                 }
                             }).setNegativeButton(R.string.cancel_input, new DialogInterface.OnClickListener() {
                         @Override
@@ -206,18 +206,13 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                 .setItems(mSlotNumberItems, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        int[] index = new int[mSelectedItems.size()];
-
-                        for (int i = 0; i < index.length; i++) {
-                            index[i] = mSelectedItems.keyAt(i);
-                        }
-                        startBookmarkLoader(index, which + 1);
+                        startBookmarkLoader(which + 1);
                     }
                 }).create();
         mSelectSlotNumberDialog.show();
     }
 
-    private void startBookmarkLoader(int[] index, int slotNumber) {
+    private void startBookmarkLoader(int slotNumber) {
         mProgressTitle = getString(R.string.bookmarking);
         mProgressDialog = ProgressDialog.show(getActivity(),
                 mProgressTitle,
@@ -226,7 +221,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
 
         Bundle args = new Bundle();
 
-        args.putIntArray(WhooingBaseLoader.ARG_CURSOR_INDEX, index);
+        args.putStringArrayList(WhooingBaseLoader.ARG_SELECTED_ITEMS, mSelectedItems);
         args.putString(WhooingKeyValues.SECTION_ID, mSectionId);
         args.putInt(FrequentItems.COLUMN_SLOT_NUMBER, slotNumber);
 
@@ -299,12 +294,19 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         }
 
         @Override
+        protected String getSelectionId(int cursorPosition) {
+            mCursor.moveToPosition(cursorPosition);
+
+            return "" + mCursor.getLong(Entries.COLUMN_INDEX_ENTRY_ID);
+        }
+
+        @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             super.onBindViewHolder(holder, position);
             switch (getItemViewType(position)) {
                 case VIEW_TYPE_ITEM: {
                     HistoryItemViewHolder viewHolder = (HistoryItemViewHolder) holder;
-                    String memo = itemCursor.getString(Entries.COLUMN_INDEX_MEMO);
+                    String memo = mCursor.getString(Entries.COLUMN_INDEX_MEMO);
 
                     if (TextUtils.isEmpty(memo)) {
                         viewHolder.memo.setVisibility(View.GONE);

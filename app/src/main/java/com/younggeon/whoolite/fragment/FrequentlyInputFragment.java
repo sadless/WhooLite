@@ -61,7 +61,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
         mNoDataStringId = R.string.no_frequent_items;
         mDeleteConfirmStringId = R.string.delete_frequent_items_confirm;
         mActionMenuId = R.menu.action_menu_frequently_input;
-        mMainDataSortOrder = FrequentItems.COLUMN_USE_COUNT + " DESC";
+        mMainDataSortOrder = FrequentItems.COLUMN_SLOT_NUMBER + " ASC, " +
+                FrequentItems.COLUMN_USE_COUNT + " DESC";
     }
 
     @Override
@@ -314,14 +315,21 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
 
     private void popAndAddToMultiInputArgsFromSelectedItems() {
         if (mSelectedItems != null) {
-            FrequentlyInputAdapter adapter = (FrequentlyInputAdapter) mRecyclerView.getAdapter();
-            Cursor c = adapter.itemCursor;
-
             while (mSelectedItems.size() > 0) {
-                int position = mSelectedItems.keyAt(0);
+                String selectionId = mSelectedItems.remove(0);
+                String[] slotNumberAndId = selectionId.split(":");
+                Cursor c = getActivity().getContentResolver().query(WhooingProvider.getFrequentItemUri(mSectionId,
+                        Integer.parseInt(slotNumberAndId[0]),
+                        slotNumberAndId[1]),
+                        null,
+                        null,
+                        null,
+                        null);
 
-                mSelectedItems.delete(position);
-                c.moveToPosition(position);
+                if (c == null) {
+                    continue;
+                }
+                c.moveToFirst();
 
                 double money = c.getDouble(FrequentItems.COLUMN_INDEX_MONEY);
                 String leftAccountType = c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE);
@@ -344,6 +352,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                             .putExtra(FrequentlyInputItemDetailActivity.EXTRA_MODE,
                                     FrequentlyInputItemDetailActivity.MODE_COMPLETE);
                     startActivityForResult(intent, REQUEST_CODE_COMPLETE_FREQUENT_ITEM);
+                    c.close();
                     return;
                 } else {
                     Bundle args = new Bundle();
@@ -361,6 +370,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                     args.putInt(EntriesLoader.ARG_SLOT_NUMBER, slotNumber);
                     mMultiInputArgs.add(args);
                 }
+                c.close();
             }
             if (mSelectedItems.size() == 0) {
                 mActionMode.finish();
@@ -431,6 +441,14 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
         }
 
         @Override
+        protected String getSelectionId(int cursorPosition) {
+            mCursor.moveToPosition(cursorPosition);
+
+            return mCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER) + ":" +
+                    mCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID);
+        }
+
+        @Override
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             super.onBindViewHolder(holder, position);
             switch (getItemViewType(position)) {
@@ -443,13 +461,13 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                             FrequentlyInputItemViewHolder vh = (FrequentlyInputItemViewHolder) v.getTag();
                             int position = vh.getAdapterPosition();
 
-                            itemCursor.moveToPosition(getCursorPosition(position));
+                            mCursor.moveToPosition(getCursorPosition(position));
 
-                            double money = itemCursor.getDouble(FrequentItems.COLUMN_INDEX_MONEY);
-                            String leftAccountType = itemCursor.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE);
-                            String rightAccountType = itemCursor.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE);
-                            int slotNumber = itemCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER);
-                            String itemId = itemCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID);
+                            double money = mCursor.getDouble(FrequentItems.COLUMN_INDEX_MONEY);
+                            String leftAccountType = mCursor.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE);
+                            String rightAccountType = mCursor.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE);
+                            int slotNumber = mCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER);
+                            String itemId = mCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID);
 
                             if (money < WhooingKeyValues.EPSILON ||
                                     TextUtils.isEmpty(leftAccountType) ||
@@ -469,12 +487,12 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                             } else {
                                 inputEntry(slotNumber,
                                         itemId,
-                                        itemCursor.getString(FrequentItems.COLUMN_INDEX_TITLE),
+                                        mCursor.getString(FrequentItems.COLUMN_INDEX_TITLE),
                                         "" + money,
                                         leftAccountType,
-                                        itemCursor.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID),
+                                        mCursor.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID),
                                         rightAccountType,
-                                        itemCursor.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID),
+                                        mCursor.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID),
                                         null);
                             }
                         }
@@ -488,9 +506,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                             intent.putExtra(FrequentlyInputItemDetailActivity.EXTRA_SECTION_ID,
                                     mSectionId)
                                     .putExtra(FrequentlyInputItemDetailActivity.EXTRA_SLOT_NUMBER,
-                                            itemCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER))
+                                            mCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER))
                                     .putExtra(FrequentlyInputItemDetailActivity.EXTRA_ITEM_ID,
-                                            itemCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID))
+                                            mCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID))
                                     .putExtra(FrequentlyInputItemDetailActivity.EXTRA_MODE,
                                             FrequentlyInputItemDetailActivity.MODE_COMPLETE);
                             startActivityForResult(intent, REQUEST_CODE_COMPLETE_FREQUENT_ITEM);
@@ -500,8 +518,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                     });
                     if (mActionMode == null) {
                         if (mCurrentProgressingItemIds.contains(
-                                itemCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER) + ":" +
-                                        itemCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID))) {
+                                mCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER) + ":" +
+                                        mCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID))) {
                             viewHolder.send.setVisibility(View.GONE);
                             viewHolder.progress.setVisibility(View.VISIBLE);
                         } else {

@@ -23,7 +23,6 @@ import android.support.v7.view.ActionMode;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
-import android.util.SparseBooleanArray;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -47,6 +46,7 @@ import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.WhooingBaseLoader;
 
 import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.Currency;
 
 /**
@@ -73,7 +73,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     protected int mDeleteConfirmStringId;
     protected int mActionMenuId;
     protected String mSectionId;
-    protected SparseBooleanArray mSelectedItems;
+    protected ArrayList<String> mSelectedItems;
     protected String mProgressTitle;
     protected String mMainDataSortOrder;
 
@@ -111,13 +111,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 getResources().getInteger(R.integer.input_item_span_count)));
         mRecyclerView.setAdapter(createAdapter((GridLayoutManager) mRecyclerView.getLayoutManager()));
         if (savedInstanceState != null) {
-            int[] selectedItems = savedInstanceState.getIntArray(INSTANCE_STATE_SELECTED_ITEMS);
+            mSelectedItems = savedInstanceState.getStringArrayList(INSTANCE_STATE_SELECTED_ITEMS);
 
-            if (selectedItems != null) {
-                mSelectedItems = new SparseBooleanArray();
-                for (int i : selectedItems) {
-                    mSelectedItems.put(i, true);
-                }
+            if (mSelectedItems != null && mSelectedItems.size() > 0) {
                 mActionMode = ((AppCompatActivity) getActivity()).startSupportActionMode(this);
             }
             if (savedInstanceState.getBoolean(INSTANCE_STATE_SHOW_DELETE_CONFIRM)) {
@@ -173,13 +169,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
 
-        if (mSelectedItems != null) {
-            int[] selectedItems = new int[mSelectedItems.size()];
-
-            for (int i = 0; i < mSelectedItems.size(); i++) {
-                selectedItems[i] = mSelectedItems.keyAt(i);
-            }
-            outState.putIntArray(INSTANCE_STATE_SELECTED_ITEMS, selectedItems);
+        if (mSelectedItems != null && mSelectedItems.size() > 0) {
+            outState.putStringArrayList(INSTANCE_STATE_SELECTED_ITEMS, mSelectedItems);
         }
         if (mDeleteConfirmDialog != null) {
             outState.putBoolean(INSTANCE_STATE_SHOW_DELETE_CONFIRM, mDeleteConfirmDialog.isShowing());
@@ -242,8 +233,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 break;
             }
             case LOADER_ID_DELETE_SELECTED_ITEMS: {
-                final WhooingBaseLoader finalLoader = (WhooingBaseLoader) loader;
-
                 if (mProgressDialog != null) {
                     mProgressDialog.dismiss();
                 }
@@ -258,7 +247,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                             .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
                                 @Override
                                 public void onClick(DialogInterface dialog, int which) {
-                                    startDeleteLoader(finalLoader.args.getIntArray(WhooingBaseLoader.ARG_CURSOR_INDEX));
+                                    startDeleteLoader();
                                 }
                             }).setNegativeButton(R.string.cancel_input, new DialogInterface.OnClickListener() {
                         @Override
@@ -370,19 +359,14 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 .setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        int[] index = new int[mSelectedItems.size()];
-
-                        for (int i = 0; i < index.length; i++) {
-                            index[i] = mSelectedItems.keyAt(i);
-                        }
-                        startDeleteLoader(index);
+                        startDeleteLoader();
                     }
                 }).setNegativeButton(R.string.cancel, null)
                 .create();
         mDeleteConfirmDialog.show();
     }
 
-    private void startDeleteLoader(int[] index) {
+    private void startDeleteLoader() {
         mProgressTitle = getString(R.string.deleting);
         mProgressDialog = ProgressDialog.show(getActivity(),
                 mProgressTitle,
@@ -391,7 +375,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         Bundle args = new Bundle();
 
-        args.putIntArray(WhooingBaseLoader.ARG_CURSOR_INDEX, index);
+        args.putStringArrayList(WhooingBaseLoader.ARG_SELECTED_ITEMS, mSelectedItems);
         args.putString(WhooingKeyValues.SECTION_ID, mSectionId);
 
         WhooingBaseLoader loader = WhooingBaseLoader.castLoader(
@@ -439,11 +423,12 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         protected static final int VIEW_TYPE_SECTION = 0;
         protected static final int VIEW_TYPE_ITEM = 1;
 
-        public Cursor itemCursor;
-
         private TextDrawable.IBuilder mIconBuilder;
+
         private int[] mSectionData;
         private int[] mSectionDataCounts;
+
+        protected Cursor mCursor;
 
         protected int mColumnIndexTitle;
         protected int mColumnIndexMoney;
@@ -456,6 +441,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         abstract protected void itemClicked(View view, Cursor cursor);
         abstract protected Uri getSectionDataUri();
         abstract protected String getSectionText(int sectionData);
+        abstract protected String getSelectionId(int cursorPosition);
 
         public WhooLiteAdapter(final GridLayoutManager gridLayoutManager) {
             super();
@@ -500,8 +486,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                             ItemViewHolder vh = (ItemViewHolder) v.getTag();
 
                             if (mActionMode == null) {
-                                itemCursor.moveToPosition(getCursorPosition(vh.getAdapterPosition()));
-                                itemClicked(v, itemCursor);
+                                mCursor.moveToPosition(getCursorPosition(vh.getAdapterPosition()));
+                                itemClicked(v, mCursor);
                             } else {
                                 toggleSelect(vh);
                             }
@@ -563,14 +549,14 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                     ItemViewHolder vh = (ItemViewHolder) holder;
 
                     position = getCursorPosition(position);
-                    itemCursor.moveToPosition(position);
+                    mCursor.moveToPosition(position);
 
-                    String title = itemCursor.getString(mColumnIndexTitle);
-                    double money = itemCursor.getDouble(mColumnIndexMoney);
-                    String leftAccountType = itemCursor.getString(mColumnIndexLeftAccountType);
-                    String rightAccountType = itemCursor.getString(mColumnIndexRightAccountType);
+                    String title = mCursor.getString(mColumnIndexTitle);
+                    double money = mCursor.getDouble(mColumnIndexMoney);
+                    String leftAccountType = mCursor.getString(mColumnIndexLeftAccountType);
+                    String rightAccountType = mCursor.getString(mColumnIndexRightAccountType);
 
-                    if (mActionMode != null && mSelectedItems.get(position)) {
+                    if (mActionMode != null && mSelectedItems.contains(getSelectionId(position))) {
                         vh.icon.setImageResource(R.drawable.ic_check);
                         vh.icon.setBackgroundResource(R.drawable.selected_icon_bg);
                         vh.itemView.setBackgroundResource(R.color.primary);
@@ -596,7 +582,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                     if (TextUtils.isEmpty(leftAccountType)) {
                         vh.left.setText(R.string.not_assigned);
                     } else {
-                        String leftTitle = itemCursor.getString(itemCursor.getColumnCount() - 2);
+                        String leftTitle = mCursor.getString(mCursor.getColumnCount() - 2);
 
                         if (TextUtils.isEmpty(leftTitle)) {
                             vh.left.setText(R.string.unknown);
@@ -617,7 +603,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                     if (TextUtils.isEmpty(rightAccountType)) {
                         vh.right.setText(R.string.not_assigned);
                     } else {
-                        String rightTitle = itemCursor.getString(itemCursor.getColumnCount() - 1);
+                        String rightTitle = mCursor.getString(mCursor.getColumnCount() - 1);
 
                         if (TextUtils.isEmpty(rightTitle)) {
                             vh.left.setText(R.string.unknown);
@@ -643,13 +629,13 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         @Override
         public int getItemCount() {
-            if (itemCursor == null) {
+            if (mCursor == null) {
                 return 0;
             }
             if (mSectionData == null) {
-                return itemCursor.getCount();
+                return mCursor.getCount();
             } else {
-                return itemCursor.getCount() + mSectionData.length;
+                return mCursor.getCount() + mSectionData.length;
             }
         }
 
@@ -669,9 +655,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                     return -1;
                 }
                 case VIEW_TYPE_ITEM: {
-                    itemCursor.moveToPosition(getCursorPosition(position));
+                    mCursor.moveToPosition(getCursorPosition(position));
 
-                    return itemCursor.getString(mColumnIndexItemId).hashCode();
+                    return mCursor.getString(mColumnIndexItemId).hashCode();
                 }
                 default: {
                     return -1;
@@ -700,7 +686,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         }
 
         public void changeCursor(Cursor cursor) {
-            itemCursor = cursor;
+            mCursor = cursor;
 
             Cursor c = getActivity().getContentResolver().query(getSectionDataUri(),
                     null,
@@ -749,27 +735,28 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         private void startActionMode(ItemViewHolder vh) {
             if (mSelectedItems == null) {
-                mSelectedItems = new SparseBooleanArray();
+                mSelectedItems = new ArrayList<>();
             } else {
                 mSelectedItems.clear();
             }
-            mSelectedItems.put(getCursorPosition(vh.getAdapterPosition()), true);
+            mSelectedItems.add(getSelectionId(getCursorPosition(vh.getAdapterPosition())));
             mActionMode = ((AppCompatActivity) getActivity()).startSupportActionMode(WhooLiteActivityBaseFragment.this);
         }
 
         private void toggleSelect(ItemViewHolder vh) {
             int position = vh.getAdapterPosition();
             int cursorPosition = getCursorPosition(position);
+            String selectionId = getSelectionId(cursorPosition);
 
-            if (mSelectedItems.get(cursorPosition)) {
-                mSelectedItems.delete(cursorPosition);
+            if (mSelectedItems.contains(selectionId)) {
+                mSelectedItems.remove(selectionId);
                 if (mSelectedItems.size() == 0) {
                     mActionMode.finish();
 
                     return;
                 }
             } else {
-                mSelectedItems.put(cursorPosition, true);
+                mSelectedItems.add(selectionId);
             }
             mRecyclerView.getAdapter().notifyItemChanged(position);
             mActionMode.setTitle(getString(R.string.item_selected,

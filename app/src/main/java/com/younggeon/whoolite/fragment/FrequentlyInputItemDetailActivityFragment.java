@@ -60,22 +60,24 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
             double money = c.getDouble(FrequentItems.COLUMN_INDEX_MONEY);
 
             mTitle.setText(c.getString(FrequentItems.COLUMN_INDEX_TITLE));
+            mLeftAccountType = c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE);
+            mLeftAccountId = c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID);
+            mRightAccountType = c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE);
+            mRightAccountId = c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID);
             if (money >= WhooingKeyValues.EPSILON) {
                 mMoney.setText(new DecimalFormat().format(money).replace(",", ""));
             } else {
                 switch (mMode) {
                     case FrequentlyInputItemDetailActivity.MODE_COMPLETE: {
-                        getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-                        mMoney.requestFocus();
+                        if (!TextUtils.isEmpty(mLeftAccountType) || !TextUtils.isEmpty(mRightAccountType)) {
+                            getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+                            mMoney.requestFocus();
+                        }
                         break;
                     }
                     default:
                 }
             }
-            mLeftAccountType = c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE);
-            mLeftAccountId = c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID);
-            mRightAccountType = c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE);
-            mRightAccountId = c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID);
             c.close();
         }
     }

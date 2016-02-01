@@ -1,16 +1,11 @@
 package com.younggeon.whoolite.whooing.loader;
 
-import android.content.ContentProviderOperation;
 import android.content.ContentValues;
 import android.content.Context;
-import android.content.OperationApplicationException;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.RemoteException;
 
 import com.android.volley.Request;
-import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.Accounts;
@@ -63,85 +58,36 @@ public class AccountsLoader extends WhooingBaseLoader {
                     JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
 
                     if ((resultCode = result.optInt(WhooingKeyValues.CODE)) == WhooingKeyValues.SUCCESS) {
-                        ArrayList<ContentProviderOperation> operations = new ArrayList<>();
                         JSONObject accounts = result.optJSONObject(WhooingKeyValues.RESULT);
                         Iterator<String> keys = accounts.keys();
-                        Uri accountsUri = WhooingProvider.getAccountsUri(sectionId);
                         int sortOrder = 0;
+                        ArrayList<ContentValues> values = new ArrayList<>();
 
                         while (keys.hasNext()) {
                             String accountType = keys.next();
                             JSONArray itemsInAccountType = accounts.optJSONArray(accountType);
-                            String ids = null;
 
                             for (int i = 0; i < itemsInAccountType.length(); i++, sortOrder++) {
                                 JSONObject accountItem = itemsInAccountType.optJSONObject(i);
-                                String accountId = accountItem.optString(WhooingKeyValues.ACCOUNT_ID);
-                                Uri accountItemUri = WhooingProvider.getAccountItemUri(sectionId,
-                                        accountType,
-                                        accountId);
-                                Cursor c = getContext().getContentResolver().query(
-                                        accountItemUri,
-                                        null,
-                                        null,
-                                        null,
-                                        null);
+                                ContentValues cv = new ContentValues();
 
-                                if (c != null) {
-                                    ContentValues cv = new ContentValues();
-                                    String title = accountItem.optString(WhooingKeyValues.TITLE);
-                                    String memo = accountItem.optString(WhooingKeyValues.MEMO);
-
-                                    if (c.moveToFirst()) {
-                                        if (!c.getString(Accounts.COLUMN_INDEX_TITLE).equals(title)) {
-                                            cv.put(Accounts.COLUMN_TITLE, title);
-                                        }
-                                        if (!c.getString(Accounts.COLUMN_INDEX_MEMO).equals(memo)) {
-                                            cv.put(Accounts.COLUMN_MEMO, memo);
-                                        }
-                                        if (c.getInt(Accounts.COLUMN_INDEX_SORT_ORDER) != sortOrder) {
-                                            cv.put(Accounts.COLUMN_SORT_ORDER, sortOrder);
-                                        }
-                                        if (cv.size() > 0) {
-                                            operations.add(ContentProviderOperation.newUpdate(accountItemUri)
-                                                    .withValues(cv).build());
-                                        }
-                                    } else {
-                                        cv.put(Accounts.COLUMN_ACCOUNT_TYPE, accountType);
-                                        cv.put(Accounts.COLUMN_ACCOUNT_ID, accountId);
-                                        cv.put(Accounts.COLUMN_TITLE, title);
-                                        cv.put(Accounts.COLUMN_MEMO, memo);
-                                        cv.put(Accounts.COLUMN_IS_GROUP,
-                                                accountItem.optString(WhooingKeyValues.TYPE).equals(GROUP));
-                                        cv.put(Accounts.COLUMN_SORT_ORDER, sortOrder);
-                                        operations.add(ContentProviderOperation.newInsert(accountsUri)
-                                                .withValues(cv).build());
-                                    }
-                                    c.close();
-                                }
-                                if (ids == null) {
-                                    ids = "('" + accountId + "'";
-                                } else {
-                                    ids += ",'" + accountId + "'";
-                                }
-                            }
-                            if (ids != null) {
-                                ids += ")";
-                                operations.add(ContentProviderOperation.newDelete(accountsUri)
-                                        .withSelection(Accounts.COLUMN_SECTION_ID + " = ? AND " +
-                                                        Accounts.COLUMN_ACCOUNT_TYPE + " = ? AND " +
-                                                        Accounts.COLUMN_ACCOUNT_ID + " NOT IN " + ids,
-                                                new String[]{sectionId, accountType})
-                                        .build());
+                                cv.put(Accounts.COLUMN_ACCOUNT_TYPE, accountType);
+                                cv.put(Accounts.COLUMN_ACCOUNT_ID, accountItem.optString(WhooingKeyValues.ACCOUNT_ID));
+                                cv.put(Accounts.COLUMN_TITLE, accountItem.optString(WhooingKeyValues.TITLE));
+                                cv.put(Accounts.COLUMN_MEMO, accountItem.optString(WhooingKeyValues.MEMO));
+                                cv.put(Accounts.COLUMN_IS_GROUP, accountItem.optString(WhooingKeyValues.TYPE).equals(GROUP));
+                                cv.put(Accounts.COLUMN_SORT_ORDER, sortOrder);
+                                values.add(cv);
+                                sortOrder++;
                             }
                         }
-                        if (operations.size() > 0) {
-                            getContext().getContentResolver().applyBatch(getContext().getString(R.string.whooing_authority),
-                                    operations);
-                        }
+
+                        ContentValues[] valuesArray = new ContentValues[values.size()];
+
+                        getContext().getContentResolver().bulkInsert(WhooingProvider.getAccountsUri(sectionId),
+                                values.toArray(valuesArray));
                     }
-                } catch (InterruptedException | ExecutionException | TimeoutException | JSONException |
-                        RemoteException | OperationApplicationException e) {
+                } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
                     e.printStackTrace();
 
                     resultCode = -1;

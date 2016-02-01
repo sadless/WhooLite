@@ -8,7 +8,7 @@ public class WhooingKeyValues {
     public static final String TOKEN_SECRET = "token_secret";
     public static final String APP_ID = "app_id";
     public static final String SIGNATURE = "signiture";
-    public static final String NOUNS = "nounce";
+    public static final String NONCE = "nounce";
     public static final String TIMESTAMP = "timestamp";
     public static final String PIN = "pin";
     public static final String APP_SECRET = "app_secret";
