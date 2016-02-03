@@ -5,13 +5,16 @@ import android.app.SearchManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.content.AsyncTaskLoader;
 import android.support.v4.content.Loader;
+import android.support.v4.database.DatabaseUtilsCompat;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.view.ActionMode;
@@ -30,6 +33,7 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.android.volley.Request;
+import com.h6ah4i.android.compat.content.SharedPreferenceCompat;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.activity.FrequentlyInputItemDetailActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
@@ -41,11 +45,12 @@ import com.younggeon.whoolite.whooing.loader.EntriesLoader;
 import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
 
 import java.util.ArrayList;
+import java.util.Set;
 
 /**
  * Created by sadless on 2016. 1. 17..
  */
-public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
+public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implements SharedPreferences.OnSharedPreferenceChangeListener {
     private static final int REQUEST_CODE_COMPLETE_FREQUENT_ITEM = 1;
 
     private static final String INSTANCE_STATE_PROGRESSING_ITEM_ID_BUNDLE = "progressing_item_id_bundle";
@@ -63,6 +68,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
     private ArrayList<Bundle> mMultiInputArgs;
     private Bundle mProgressingItemIdBundle;
     private String mQueryText;
+    private String mShowSlotNumberWhere;
+    private String mSearchResultWhere;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -72,13 +79,13 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
         mNoDataStringId = R.string.no_frequent_items;
         mDeleteConfirmStringId = R.string.delete_frequent_items_confirm;
         mActionMenuId = R.menu.action_menu_frequently_input;
-        mMainDataSortOrder = FrequentItems.COLUMN_SLOT_NUMBER + " ASC, " +
-                FrequentItems.COLUMN_USE_COUNT + " DESC";
         setHasOptionsMenu(true);
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+
         if (savedInstanceState != null) {
             mProgressingItemIdBundle = savedInstanceState.getBundle(INSTANCE_STATE_PROGRESSING_ITEM_ID_BUNDLE);
             mLastLoaderId = savedInstanceState.getInt(INSTANCE_STATE_LAST_LOADER_ID);
@@ -89,6 +96,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
             mProgressingItemIdBundle = new Bundle();
             mLastLoaderId = LOADER_ID_ENTRY_INPUT_START;
             mProgressingLoaderIds = new ArrayList<>();
+            refreshWhere(prefs, false);
+            refreshSortOrder(prefs, false);
         }
 
         View view = super.onCreateView(inflater, container, savedInstanceState);
@@ -102,8 +111,17 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
             mEmptyText.setText(R.string.no_search_result);
             mEmptyText.setVisibility(View.VISIBLE);
         }
+        prefs.registerOnSharedPreferenceChangeListener(this);
 
         return view;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+
+        PreferenceManager.getDefaultSharedPreferences(getActivity())
+                .unregisterOnSharedPreferenceChangeListener(this);
     }
 
     @Override
@@ -231,7 +249,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
                     mEmptyText.setText(R.string.no_search_result);
                     mRetryButton.setVisibility(View.GONE);
                 } else {
-                    mMainDataWhere = null;
+                    mSearchResultWhere = null;
+                    mMainDataWhere = mShowSlotNumberWhere;
                     getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, FrequentlyInputFragment.this);
                     mEmptyText.setText(mNoDataStringId);
                     mRetryButton.setVisibility(View.VISIBLE);
@@ -277,7 +296,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
         switch (loader.getId()) {
             case LOADER_ID_QUERY: {
                 if (!TextUtils.isEmpty(mQueryText)) {
-                    mMainDataWhere = FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_TITLE + " IN " + data;
+                    mSearchResultWhere = FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_TITLE + " IN " + data;
+                    mMainDataWhere = DatabaseUtilsCompat.concatenateWhere(mSearchResultWhere, mShowSlotNumberWhere);
                     getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, this);
                 }
                 break;
@@ -363,6 +383,15 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
             default: {
                 return super.onActionItemClicked(mode, item);
             }
+        }
+    }
+
+    @Override
+    public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
+        if (key.equals(getString(R.string.pref_key_show_slot_numbers))) {
+            refreshWhere(sharedPreferences, true);
+        } else if (key.equals(getString(R.string.pref_key_frequently_input_sort_order))) {
+            refreshSortOrder(sharedPreferences, true);
         }
     }
 
@@ -461,6 +490,50 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment {
             if (mSelectedItems.size() == 0) {
                 mActionMode.finish();
             }
+        }
+    }
+
+    private void refreshWhere(SharedPreferences prefs, boolean needRestartMainData) {
+        if (prefs == null) {
+            prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        }
+        Set<String> showSlotNumberSet = SharedPreferenceCompat.getStringSet(prefs,
+                getString(R.string.pref_key_show_slot_numbers),
+                null);
+
+        if (showSlotNumberSet != null) {
+            boolean isFirst = true;
+
+            mShowSlotNumberWhere = FrequentItems.COLUMN_SLOT_NUMBER + " IN " + "(";
+            for (String slotNumber : showSlotNumberSet) {
+                if (isFirst) {
+                    mShowSlotNumberWhere += slotNumber;
+                    isFirst = false;
+                } else {
+                    mShowSlotNumberWhere += "," + slotNumber;
+                }
+            }
+            mShowSlotNumberWhere += ")";
+            mMainDataWhere = DatabaseUtilsCompat.concatenateWhere(mSearchResultWhere, mShowSlotNumberWhere);
+        }
+        if (needRestartMainData) {
+            getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, FrequentlyInputFragment.this);
+        }
+    }
+
+    private void refreshSortOrder(SharedPreferences prefs, boolean needRestartMainData) {
+        if (prefs == null) {
+            prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        }
+        String sortOrderFormat = prefs.getString(getString(R.string.pref_key_frequently_input_sort_order),
+                getString(R.string.pref_frequently_input_sort_order_default));
+
+        mMainDataSortOrder = String.format(FrequentItems.TABLE_NAME + "." + sortOrderFormat,
+                FrequentItems.COLUMN_USE_COUNT,
+                FrequentItems.COLUMN_LAST_USE_TIME,
+                FrequentItems.COLUMN_SORT_ORDER);
+        if (needRestartMainData) {
+            getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, FrequentlyInputFragment.this);
         }
     }
 

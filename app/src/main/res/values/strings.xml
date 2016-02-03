@@ -3,7 +3,7 @@
 
     <string name="app_name">후라이</string>
     <string name="hello_world">Hello world!</string>
-    <string name="action_settings">Settings</string>
+    <string name="action_settings">설정</string>
     <string name="title_activity_welcome">WelcomeActivity</string>
     <string name="next">다음</string>
     <string name="welcome_message">환영합니다! 후잉을 가장 가볍게 사용할 수 있는 후라이(WhooLite)입니다.</string>
@@ -86,4 +86,24 @@
     <string name="action_search">검색</string>
     <string name="action_search_hint">자주입력 거래들 검색</string>
     <string name="no_search_result">검색결과가 없습니다.</string>
+    <string name="title_activity_settings">설정</string>
+    <string name="show_slot_numbers">표시할 자주입력 거래 슬롯 번호</string>
+    <string name="show_slot_numbers_dialog_title">슬롯 번호 선택</string>
+    <string name="frequently_input_sort_order">자주입력 거래 정렬 방식</string>
+    <string name="frequently_input_dialog_title">정렬 방식 선택</string>
+    <string name="all">모든</string>
+    <string name="numbering">%1$d번</string>
+    <string name="slot">슬롯</string>
+
+    <string-array name="pref_show_slot_number_titles">
+        <item>1번 슬롯</item>
+        <item>2번 슬롯</item>
+        <item>3번 슬롯</item>
+    </string-array>
+
+    <string-array name="pref_frequently_input_sort_order_titles">
+        <item>서버에 설정된대로</item>
+        <item>자주사용한 순서로</item>
+        <item>최근 사용한 순서로</item>
+    </string-array>
 </resources>

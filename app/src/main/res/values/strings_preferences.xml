@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pref_key_show_slot_numbers" translatable="false">show_slot_numbers</string>
+    <string name="pref_key_frequently_input_sort_order" translatable="false">frequently_input_sort_order</string>
+    <string name="pref_frequently_input_sort_order_default">%3$s ASC</string>
+
+    <string-array name="pref_show_slot_number_values" translatable="false">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+
+    <string-array name="pref_frequently_input_sort_order_values" translatable="false">
+        <item>@string/pref_frequently_input_sort_order_default</item>
+        <item>%1$s DESC</item>
+        <item>%2$s DESC</item>
+    </string-array>
+</resources>

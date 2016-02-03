@@ -63,6 +63,14 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.younggeon.whoolite.activity.WhooLiteActivity" />
         </activity>
+        <activity
+            android:name=".activity.SettingsActivity"
+            android:label="@string/title_activity_settings"
+            android:parentActivityName=".activity.WhooLiteActivity">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.younggeon.whoolite.activity.WhooLiteActivity" />
+        </activity>
     </application>
 
 </manifest>

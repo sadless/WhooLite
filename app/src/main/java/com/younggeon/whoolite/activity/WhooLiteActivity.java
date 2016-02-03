@@ -1,6 +1,5 @@
 package com.younggeon.whoolite.activity;
 
-import android.app.SearchManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -22,7 +21,6 @@ import android.support.v4.widget.CursorAdapter;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.widget.Toolbar;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -75,7 +73,7 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
         mSectionsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                SectionsAdapter adapter = (SectionsAdapter)parent.getAdapter();
+                SectionsAdapter adapter = (SectionsAdapter) parent.getAdapter();
                 Cursor c = adapter.getCursor();
 
                 c.moveToPosition(position);
@@ -156,20 +154,13 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
 
                 return true;
             }
+            case R.id.action_settings: {
+                startActivity(new Intent(this, SettingsActivity.class));
+                return true;
+            }
             default: {
                 return super.onOptionsItemSelected(item);
             }
-        }
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-
-        if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
-            String query = intent.getStringExtra(SearchManager.QUERY);
-            //use the query to search your data somehow
-            Log.i("query", query);
         }
     }
 

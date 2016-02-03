@@ -64,6 +64,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     private static final String INSTANCE_STATE_SHOW_DELETE_CONFIRM = "show_delete_confirm";
     private static final String INSTANCE_STATE_PROGRESS_DIALOG = "progress_dialog";
     private static final String INSTANCE_STATE_PROGRESS_TITLE = "progress_title";
+    private static final String INSTANCE_STATE_MAIN_DATA_WHERE = "main_data_where";
+    private static final String INSTANCE_STATE_MAIN_DATA_SORT_ORDER = "main_data_sort_order";
 
     abstract protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager);
     abstract protected Uri getMainDataUri();
@@ -124,6 +126,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                         mProgressTitle,
                         getString(R.string.please_wait));
             }
+            mMainDataWhere = savedInstanceState.getString(INSTANCE_STATE_MAIN_DATA_WHERE);
+            mMainDataSortOrder = savedInstanceState.getString(INSTANCE_STATE_MAIN_DATA_SORT_ORDER);
         }
         setSectionId(prefs.getString(PreferenceKeys.CURRENT_SECTION_ID, null));
         mProgressBar = (ProgressBar) view.findViewById(R.id.progress);
@@ -183,6 +187,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 outState.putString(INSTANCE_STATE_PROGRESS_TITLE, mProgressTitle);
             }
         }
+        outState.putString(INSTANCE_STATE_MAIN_DATA_WHERE, mMainDataWhere);
+        outState.putString(INSTANCE_STATE_MAIN_DATA_SORT_ORDER, mMainDataSortOrder);
     }
 
     @Override
@@ -691,7 +697,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
             Cursor c = getActivity().getContentResolver().query(getSectionDataUri(),
                     null,
-                    null,
+                    mMainDataWhere,
                     null,
                     null);
 
