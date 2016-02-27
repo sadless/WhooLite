@@ -745,8 +745,9 @@ public class WhooingProvider extends ContentProvider {
                     }
                     idArray += ")";
                     count += db.delete(Entries.TABLE_NAME,
+                            Entries.COLUMN_SECTION_ID + " = ? AND " +
                             Entries.COLUMN_ENTRY_ID + " NOT IN " + idArray,
-                            null);
+                            new String[] {sectionId});
                 }
                 db.setTransactionSuccessful();
                 db.endTransaction();

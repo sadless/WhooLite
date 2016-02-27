@@ -125,8 +125,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     }
 
     @Override
-    protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager) {
-        return new FrequentlyInputAdapter(layoutManager);
+    protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager, Cursor cursor) {
+        return new FrequentlyInputAdapter(layoutManager, cursor);
     }
 
     @Override
@@ -468,6 +468,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                                     FrequentlyInputItemDetailActivity.MODE_COMPLETE);
                     startActivityForResult(intent, REQUEST_CODE_COMPLETE_FREQUENT_ITEM);
                     c.close();
+
                     return;
                 } else {
                     Bundle args = new Bundle();
@@ -488,6 +489,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                 c.close();
             }
             if (mSelectedItems.size() == 0) {
+                for (Bundle arg : mMultiInputArgs) {
+                    inputEntry(arg);
+                }
                 mActionMode.finish();
             }
         }
@@ -532,6 +536,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                 FrequentItems.COLUMN_USE_COUNT,
                 FrequentItems.COLUMN_LAST_USE_TIME,
                 FrequentItems.COLUMN_SORT_ORDER);
+        mMainDataSortOrder = FrequentItems.COLUMN_SLOT_NUMBER + " ASC, " + mMainDataSortOrder;
         if (needRestartMainData) {
             getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, FrequentlyInputFragment.this);
         }
@@ -551,8 +556,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     }
 
     private class FrequentlyInputAdapter extends WhooLiteAdapter {
-        public FrequentlyInputAdapter(GridLayoutManager gridLayoutManager) {
-            super(gridLayoutManager);
+        public FrequentlyInputAdapter(GridLayoutManager gridLayoutManager, Cursor cursor) {
+            super(gridLayoutManager, cursor);
 
             mColumnIndexTitle = FrequentItems.COLUMN_INDEX_TITLE;
             mColumnIndexMoney = FrequentItems.COLUMN_INDEX_MONEY;

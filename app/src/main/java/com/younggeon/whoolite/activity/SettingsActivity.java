@@ -6,8 +6,10 @@ import android.os.Bundle;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
+import android.support.v4.app.NavUtils;
 import android.support.v7.app.ActionBar;
 import android.support.v7.widget.Toolbar;
+import android.view.MenuItem;
 import android.view.View;
 
 import com.h6ah4i.android.compat.content.SharedPreferenceCompat;
@@ -49,6 +51,20 @@ public class SettingsActivity extends AppCompatPreferenceActivity implements Def
     }
 
     @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home: {
+                NavUtils.navigateUpFromSameTask(this);
+
+                return true;
+            }
+            default: {
+                return super.onOptionsItemSelected(item);
+            }
+        }
+    }
+
+    @Override
     public void initializePreferences(MultiSelectListPreferenceCompat showSlotNumber, ListPreference sortOrder) {
         showSlotNumber.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
             @SuppressWarnings("unchecked")
@@ -86,8 +102,10 @@ public class SettingsActivity extends AppCompatPreferenceActivity implements Def
 
     private void setupActionBar() {
         ActionBar actionBar = getSupportActionBar();
+
         if (actionBar != null) {
             actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setHomeButtonEnabled(true);
         }
     }
 

@@ -247,7 +247,9 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
                                         @Override
                                         public void onClick(DialogInterface dialog, int which) {
                                             getSupportLoaderManager()
-                                                    .getLoader(LOADER_ID_REFRESH_SECTIONS).forceLoad();
+                                                    .initLoader(LOADER_ID_REFRESH_SECTIONS,
+                                                            null,
+                                                            WhooLiteActivity.this).forceLoad();
                                         }
                                     }).setCancelable(false)
                                     .create().show();

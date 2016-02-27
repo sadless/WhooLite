@@ -42,7 +42,8 @@ public class Utility {
     public static void logout(Context context) {
         PreferenceManager.getDefaultSharedPreferences(context).edit()
                 .remove(PreferenceKeys.API_KEY_FORMAT)
-                .remove(PreferenceKeys.CURRENT_SECTION_ID).apply();
+                .remove(PreferenceKeys.CURRENT_SECTION_ID)
+                .remove(context.getString(R.string.pref_key_show_slot_numbers)).apply();
         context.getContentResolver().delete(WhooingProvider.getSectionsUri(),
                 null,
                 null);

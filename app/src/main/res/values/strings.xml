@@ -6,7 +6,7 @@
     <string name="action_settings">설정</string>
     <string name="title_activity_welcome">WelcomeActivity</string>
     <string name="next">다음</string>
-    <string name="welcome_message">환영합니다! 후잉을 가장 가볍게 사용할 수 있는 후라이(WhooLite)입니다.</string>
+    <string name="thank_you_message">후라이를 설치해주셔서 감사합니다!\n사용을 위해 후잉로그인이 필요합니다.</string>
     <string name="login">로그인</string>
     <string name="failed_to_receive_token">로그인을 하기 위한 정보를 가져오지 못했습니다. 네트워크 상태를 확인하시고 다시 시도해주세요.</string>
     <string name="retry">다시 시도</string>
@@ -24,7 +24,7 @@
     <string name="no_history">가계부 항목을 입력한 내용이 없습니다. + 버튼을 눌러서 항목을 입력해보세요!</string>
     <string name="frequently_input">자주입력 거래들</string>
     <string name="entries">거래내역</string>
-    <string name="no_frequent_items">자주입력 거래들 항목이 없습니다. 오른쪽 탭에 있는 거래내역을 통해서 항목을 만들어보세요!</string>
+    <string name="no_frequent_items">자주입력 거래들 항목이 없습니다. 거래내역 탭에서 항목을 만들어보세요!</string>
     <string name="failed_to_receive_frequent_item">자주입력 거래들 항목을 가져오지 못했습니다. 네트워크 상태를 확인하시고 다시 시도해주세요.</string>
     <string name="description_input_icon">항목 선택</string>
     <string name="not_assigned">(지정 안됨)</string>
@@ -94,6 +94,12 @@
     <string name="all">모든</string>
     <string name="numbering">%1$d번</string>
     <string name="slot">슬롯</string>
+    <string name="start">시작하기</string>
+    <string name="action_skip">건너뛰기</string>
+    <string name="description_write">쓰기</string>
+    <string name="manual_1">쓰기 버튼을 터치하여 거래 내역을 입력하실 수 있습니다.</string>
+    <string name="manual_2">거래내역을 터치하여 수정하거나 자주입력 거래 항목을 생성할 수 있습니다.</string>
+    <string name="manual_3">거래 입력 버튼을 터치하거나 길게 눌러 바로 입력하거나 수정 후 입력할 수 있습니다.</string>
 
     <string-array name="pref_show_slot_number_titles">
         <item>1번 슬롯</item>
@@ -106,4 +112,5 @@
         <item>자주사용한 순서로</item>
         <item>최근 사용한 순서로</item>
     </string-array>
+    <string name="title_activity_manual">사용법</string>
 </resources>

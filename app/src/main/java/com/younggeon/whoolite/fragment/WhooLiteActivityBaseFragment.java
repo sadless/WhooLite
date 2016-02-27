@@ -67,7 +67,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     private static final String INSTANCE_STATE_MAIN_DATA_WHERE = "main_data_where";
     private static final String INSTANCE_STATE_MAIN_DATA_SORT_ORDER = "main_data_sort_order";
 
-    abstract protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager);
+    abstract protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager, Cursor cursor);
     abstract protected Uri getMainDataUri();
 
     protected int mReceiveFailedStringId;
@@ -85,8 +85,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     protected Button mRetryButton;
     protected TextView mEmptyText;
     protected ProgressBar mProgressBar;
-
     protected ProgressDialog mProgressDialog;
+
     private Currency mCurrency;
     private LinearLayout mEmptyLayout;
     private AlertDialog mDeleteConfirmDialog;
@@ -94,11 +94,33 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            setSectionId(intent.getStringExtra(Actions.EXTRA_SECTION_ID));
-            getLoaderManager().restartLoader(LOADER_ID_REFRESH_MAIN_DATA,
-                    null,
-                    WhooLiteActivityBaseFragment.this).forceLoad();
-            getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, WhooLiteActivityBaseFragment.this);
+            String sectionId = intent.getStringExtra(Actions.EXTRA_SECTION_ID);
+
+            if (!sectionId.equals(mSectionId)) {
+                setSectionId(intent.getStringExtra(Actions.EXTRA_SECTION_ID));
+
+                Cursor c = getActivity().getContentResolver().query(getMainDataUri(),
+                        null,
+                        null,
+                        null,
+                        null);
+
+                if (c != null) {
+                    if (!c.moveToFirst()) {
+                        mRecyclerView.setVisibility(View.GONE);
+                        mRecyclerView.setAdapter(null);
+                        mEmptyLayout.setVisibility(View.VISIBLE);
+                        mEmptyText.setVisibility(View.GONE);
+                        mRetryButton.setVisibility(View.GONE);
+                        mProgressBar.setVisibility(View.VISIBLE);
+                    }
+                    c.close();
+                }
+                getLoaderManager().restartLoader(LOADER_ID_REFRESH_MAIN_DATA,
+                        null,
+                        WhooLiteActivityBaseFragment.this).forceLoad();
+                getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, WhooLiteActivityBaseFragment.this);
+            }
         }
     };
 
@@ -109,9 +131,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
 
         mRecyclerView = (RecyclerView) view.findViewById(R.id.list);
-        mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(),
-                getResources().getInteger(R.integer.input_item_span_count)));
-        mRecyclerView.setAdapter(createAdapter((GridLayoutManager) mRecyclerView.getLayoutManager()));
         if (savedInstanceState != null) {
             mSelectedItems = savedInstanceState.getStringArrayList(INSTANCE_STATE_SELECTED_ITEMS);
 
@@ -146,7 +165,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             }
         });
         getActivity().registerReceiver(mReceiver, new IntentFilter(Actions.SECTION_ID_CHANGED));
-        getLoaderManager().initLoader(LOADER_ID_MAIN_DATA, null, this);
         getLoaderManager().initLoader(LOADER_ID_ACCOUNT, null, this);
         getLoaderManager().initLoader(LOADER_ID_DELETE_SELECTED_ITEMS, null, this);
 
@@ -167,6 +185,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         if (mActionMode == null && mSectionId != null && getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) == null) {
             getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA, null, this).forceLoad();
         }
+        getLoaderManager().initLoader(LOADER_ID_MAIN_DATA, null, this);
     }
 
     @Override
@@ -221,11 +240,17 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         switch (loader.getId()) {
             case LOADER_ID_MAIN_DATA: {
                 Cursor cursor = (Cursor) data;
+                WhooLiteAdapter adapter = (WhooLiteAdapter) mRecyclerView.getAdapter();
 
-                if (cursor.getCount() > 0) {
-                    WhooLiteAdapter adapter = (WhooLiteAdapter) mRecyclerView.getAdapter();
-
+                if (adapter == null) {
+                    mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(),
+                            getResources().getInteger(R.integer.input_item_span_count)));
+                    mRecyclerView.setAdapter(createAdapter((GridLayoutManager) mRecyclerView.getLayoutManager(),
+                            cursor));
+                } else {
                     adapter.changeCursor(cursor);
+                }
+                if (cursor.getCount() > 0) {;
                     mRecyclerView.setVisibility(View.VISIBLE);
                     mEmptyLayout.setVisibility(View.GONE);
                 } else {
@@ -450,9 +475,10 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         abstract protected String getSectionText(int sectionData);
         abstract protected String getSelectionId(int cursorPosition);
 
-        public WhooLiteAdapter(final GridLayoutManager gridLayoutManager) {
+        public WhooLiteAdapter(final GridLayoutManager gridLayoutManager, Cursor cursor) {
             super();
 
+            changeCursor(cursor);
             mIconBuilder = TextDrawable.builder().round();
             setHasStableIds(true);
             gridLayoutManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {

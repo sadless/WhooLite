@@ -372,7 +372,21 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
                 if (resultItem != null) {
                     ContentValues cv = new ContentValues();
+                    Cursor c = getContext().getContentResolver().query(WhooingProvider.getFrequentItemsUri(
+                            args.getString(WhooingKeyValues.SECTION_ID)),
+                            new String[] {FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_SORT_ORDER},
+                            null,
+                            null,
+                            FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_SORT_ORDER + " DESC");
 
+                    if (c != null) {
+                        if (c.moveToFirst()) {
+                            cv.put(FrequentItems.COLUMN_SORT_ORDER, c.getInt(0) + 1);
+                        } else {
+                            cv.put(FrequentItems.COLUMN_SORT_ORDER, 0);
+                        }
+                        c.close();
+                    }
                     cv.put(FrequentItems.COLUMN_SLOT_NUMBER, slotNumber);
                     cv.put(FrequentItems.COLUMN_ITEM_ID, resultItem.optString(WhooingKeyValues.ITEM_ID));
                     cv.put(FrequentItems.COLUMN_TITLE, resultItem.optString(WhooingKeyValues.ITEM_TITLE));

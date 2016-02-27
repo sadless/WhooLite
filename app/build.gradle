@@ -8,8 +8,8 @@ android {
         applicationId "com.younggeon.whoolite"
         minSdkVersion 10
         targetSdkVersion 23
-        versionCode 1602040
-        versionName "160204"
+        versionCode 1602280
+        versionName "160228"
     }
     buildTypes {
         release {

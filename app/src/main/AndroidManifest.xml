@@ -71,6 +71,10 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.younggeon.whoolite.activity.WhooLiteActivity" />
         </activity>
+        <activity
+            android:name=".activity.ManualActivity"
+            android:label="@string/title_activity_manual"
+            android:theme="@style/AppTheme"/>
     </application>
 
 </manifest>

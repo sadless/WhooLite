@@ -64,8 +64,8 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     }
 
     @Override
-    protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager) {
-        return new HistoryAdapter(layoutManager);
+    protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager, Cursor cursor) {
+        return new HistoryAdapter(layoutManager, cursor);
     }
 
     @Override
@@ -243,8 +243,8 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     }
 
     private class HistoryAdapter extends WhooLiteAdapter {
-        public HistoryAdapter(GridLayoutManager gridLayoutManager) {
-            super(gridLayoutManager);
+        public HistoryAdapter(GridLayoutManager gridLayoutManager, Cursor cursor) {
+            super(gridLayoutManager, cursor);
 
             mColumnIndexTitle = Entries.COLUMN_INDEX_TITLE;
             mColumnIndexMoney = Entries.COLUMN_INDEX_MONEY;

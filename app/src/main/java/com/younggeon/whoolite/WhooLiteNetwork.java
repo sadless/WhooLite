@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Bundle;
 
 import com.android.volley.AuthFailureError;
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.toolbox.StringRequest;
@@ -36,6 +37,7 @@ public class WhooLiteNetwork {
             super(method, url, listener, errorListener);
 
             this.mApiKeyFormat = apiKeyFormat;
+            setRetryPolicy(new DefaultRetryPolicy(0, 0, 0));
         }
 
         public WhooingRequest(int method,
@@ -48,6 +50,7 @@ public class WhooLiteNetwork {
 
             this.mApiKeyFormat = apiKeyFormat;
             this.mParams = params;
+            setRetryPolicy(new DefaultRetryPolicy(0, 0, 0));
         }
 
         @Override
