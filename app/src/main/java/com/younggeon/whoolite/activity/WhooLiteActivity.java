@@ -31,6 +31,7 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.android.volley.Request;
+import com.google.android.gms.ads.AdView;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.constant.Actions;
 import com.younggeon.whoolite.constant.PreferenceKeys;
@@ -126,6 +127,7 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
         pager.setAdapter(adapter);
         pager.setOffscreenPageLimit(adapter.getCount());
         tabLayout.setupWithViewPager(pager);
+        Utility.setAdView(mAdView = (AdView) findViewById(R.id.adview));
     }
 
     @Override

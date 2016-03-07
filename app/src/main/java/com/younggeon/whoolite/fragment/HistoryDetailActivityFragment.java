@@ -162,6 +162,7 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
         if (mEntryId >= 0) {
             getLoaderManager().initLoader(LOADER_ID_EDIT_SEND, null, this);
             getLoaderManager().initLoader(LOADER_ID_DELETE, null, this);
+            getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
         } else {
             getLoaderManager().initLoader(LOADER_ID_SEND, null, this);
         }

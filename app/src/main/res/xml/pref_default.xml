@@ -1,19 +1,18 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
-
     <com.h6ah4i.android.compat.preference.MultiSelectListPreferenceCompat
-        android:key="@string/pref_key_show_slot_numbers"
-        android:entries="@array/pref_show_slot_number_titles"
-        android:entryValues="@array/pref_show_slot_number_values"
         android:defaultValue="@array/pref_show_slot_number_values"
         android:dialogTitle="@string/show_slot_numbers_dialog_title"
-        android:title="@string/show_slot_numbers"/>
+        android:entries="@array/pref_show_slot_number_titles"
+        android:entryValues="@array/pref_show_slot_number_values"
+        android:key="@string/pref_key_show_slot_numbers"
+        android:title="@string/show_slot_numbers" />
 
     <ListPreference
         android:defaultValue="@string/pref_frequently_input_sort_order_default"
+        android:dialogTitle="@string/frequently_input_dialog_title"
         android:entries="@array/pref_frequently_input_sort_order_titles"
         android:entryValues="@array/pref_frequently_input_sort_order_values"
         android:key="@string/pref_key_frequently_input_sort_order"
-        android:title="@string/frequently_input_sort_order"
-        android:dialogTitle="@string/frequently_input_dialog_title"/>
+        android:title="@string/frequently_input_sort_order" />
 
 </PreferenceScreen>

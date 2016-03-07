@@ -81,23 +81,23 @@ public class SettingsActivity extends AppCompatPreferenceActivity implements Def
                             values).apply();
                     newValue = values;
                 }
-                refreshShowSlotNumberSummary((MultiSelectListPreferenceCompat) preference,
+                setShowSlotNumberValue((MultiSelectListPreferenceCompat) preference,
                         (Set<String>) newValue);
 
                 return true;
             }
         });
-        refreshShowSlotNumberSummary(showSlotNumber, null);
+        setShowSlotNumberValue(showSlotNumber, null);
         sortOrder.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
-                refreshSortOrder((ListPreference) preference,
+                setSortOrderValue((ListPreference) preference,
                         (String) newValue);
 
                 return true;
             }
         });
-        refreshSortOrder(sortOrder, null);
+        setSortOrderValue(sortOrder, null);
     }
 
     private void setupActionBar() {
@@ -109,7 +109,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity implements Def
         }
     }
 
-    private void refreshShowSlotNumberSummary(MultiSelectListPreferenceCompat showSlotNumber, Set<String> values) {
+    private void setShowSlotNumberValue(MultiSelectListPreferenceCompat showSlotNumber, Set<String> values) {
         String summary = null;
 
         if (values == null) {
@@ -136,7 +136,7 @@ public class SettingsActivity extends AppCompatPreferenceActivity implements Def
         showSlotNumber.setSummary(summary);
     }
 
-    private void refreshSortOrder(ListPreference sortOrder, String value) {
+    private void setSortOrderValue(ListPreference sortOrder, String value) {
         if (value == null) {
             value = sortOrder.getValue();
         }

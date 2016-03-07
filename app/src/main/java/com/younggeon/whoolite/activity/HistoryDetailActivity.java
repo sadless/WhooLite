@@ -3,7 +3,9 @@ package com.younggeon.whoolite.activity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
 
+import com.google.android.gms.ads.AdView;
 import com.younggeon.whoolite.R;
+import com.younggeon.whoolite.util.Utility;
 
 public class HistoryDetailActivity extends FinishableActivity {
     public static final String EXTRA_SECTION_ID = "section_id";
@@ -21,5 +23,6 @@ public class HistoryDetailActivity extends FinishableActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setHomeButtonEnabled(true);
         }
+        Utility.setAdView(mAdView = (AdView) findViewById(R.id.adview));
     }
 }

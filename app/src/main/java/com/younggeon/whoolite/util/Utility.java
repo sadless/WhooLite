@@ -5,7 +5,11 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AlertDialog;
+import android.view.View;
 
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdView;
+import com.younggeon.whoolite.BuildConfig;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.activity.WelcomeActivity;
 import com.younggeon.whoolite.constant.Actions;
@@ -76,5 +80,14 @@ public class Utility {
         dateFormatString += " E";
 
         return new SimpleDateFormat(dateFormatString, Locale.getDefault());
+    }
+
+    public static void setAdView(AdView adView) {
+        AdRequest adRequest = new AdRequest.Builder()
+                .addTestDevice(BuildConfig.TEST_DEVICE)
+                .build();
+
+        adView.loadAd(adRequest);
+        adView.setVisibility(View.VISIBLE);
     }
 }

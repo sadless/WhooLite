@@ -3,7 +3,6 @@ package com.younggeon.whoolite.whooing.loader;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteException;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.content.Loader;
@@ -97,13 +96,9 @@ public class EntriesLoader extends WhooingBaseLoader {
                         cv.put(Entries.COLUMN_TITLE, resultItem.optString(WhooingKeyValues.ITEM_TITLE));
                         cv.put(Entries.COLUMN_MONEY, resultItem.optDouble(WhooingKeyValues.MONEY));
                         cv.put(Entries.COLUMN_MEMO, resultItem.optString(WhooingKeyValues.MEMO));
-                        try {
-                            getContext().getContentResolver()
-                                    .insert(WhooingProvider.getEntriesUri(sectionId),
-                                            cv);
-                        } catch (SQLiteException e) {
-                            e.printStackTrace();
-                        }
+                        getContext().getContentResolver()
+                                .insert(WhooingProvider.getEntriesUri(sectionId),
+                                        cv);
                     }
                 } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
                     e.printStackTrace();
