@@ -664,8 +664,14 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                     viewHolder.send.setOnLongClickListener(new View.OnLongClickListener() {
                         @Override
                         public boolean onLongClick(View v) {
+                            FrequentlyInputItemViewHolder vh = (FrequentlyInputItemViewHolder) v.getTag();
+                            int position = vh.getAdapterPosition();
+
+                            mCursor.moveToPosition(getCursorPosition(position));
+
                             Intent intent = new Intent(getActivity(),
                                     FrequentlyInputItemDetailActivity.class);
+
 
                             intent.putExtra(FrequentlyInputItemDetailActivity.EXTRA_SECTION_ID,
                                     mSectionId)
