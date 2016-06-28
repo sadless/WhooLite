@@ -7,15 +7,12 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.graphics.drawable.Drawable;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
-import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -40,8 +37,8 @@ import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.constant.Actions;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
-import com.younggeon.whoolite.db.schema.Sections;
-import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Account;
+import com.younggeon.whoolite.realm.Section;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.WhooingBaseLoader;
 
@@ -49,26 +46,27 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Currency;
 
+import io.realm.Realm;
+import io.realm.RealmChangeListener;
+import io.realm.RealmQuery;
+import io.realm.RealmResults;
+
 /**
  * Created by sadless on 2016. 1. 5..
  */
 public abstract class WhooLiteActivityBaseFragment extends Fragment implements LoaderManager.LoaderCallbacks,
     ActionMode.Callback {
-    private static final int LOADER_ID_ACCOUNT = 100;
-
-    protected static final int LOADER_ID_MAIN_DATA = 101;
-    protected static final int LOADER_ID_DELETE_SELECTED_ITEMS = 102;
-    protected static final int LOADER_ID_REFRESH_MAIN_DATA = 103;
+    protected static final int LOADER_ID_DELETE_SELECTED_ITEMS = 101;
+    protected static final int LOADER_ID_REFRESH_MAIN_DATA = 102;
 
     private static final String INSTANCE_STATE_SELECTED_ITEMS = "selected_items";
     private static final String INSTANCE_STATE_SHOW_DELETE_CONFIRM = "show_delete_confirm";
     private static final String INSTANCE_STATE_PROGRESS_DIALOG = "progress_dialog";
     private static final String INSTANCE_STATE_PROGRESS_TITLE = "progress_title";
-    private static final String INSTANCE_STATE_MAIN_DATA_WHERE = "main_data_where";
-    private static final String INSTANCE_STATE_MAIN_DATA_SORT_ORDER = "main_data_sort_order";
 
-    abstract protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager, Cursor cursor);
-    abstract protected Uri getMainDataUri();
+    abstract protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager);
+    abstract protected int getDataCount();
+    abstract protected void sectionChanged();
 
     protected int mReceiveFailedStringId;
     protected int mNoDataStringId;
@@ -77,8 +75,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     protected String mSectionId;
     protected ArrayList<String> mSelectedItems;
     protected String mProgressTitle;
-    protected String mMainDataSortOrder;
-    protected String mMainDataWhere;
+    protected Realm mRealm;
 
     protected ActionMode mActionMode;
     protected RecyclerView mRecyclerView;
@@ -90,6 +87,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     private Currency mCurrency;
     private LinearLayout mEmptyLayout;
     private AlertDialog mDeleteConfirmDialog;
+    private RealmQuery<Account> mAccountQuery;
+    private RealmResults<Account> mAccounts;
 
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -98,28 +97,10 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
             if (!sectionId.equals(mSectionId)) {
                 setSectionId(intent.getStringExtra(Actions.EXTRA_SECTION_ID));
-
-                Cursor c = getActivity().getContentResolver().query(getMainDataUri(),
-                        null,
-                        null,
-                        null,
-                        null);
-
-                if (c != null) {
-                    if (!c.moveToFirst()) {
-                        mRecyclerView.setVisibility(View.GONE);
-                        mRecyclerView.setAdapter(null);
-                        mEmptyLayout.setVisibility(View.VISIBLE);
-                        mEmptyText.setVisibility(View.GONE);
-                        mRetryButton.setVisibility(View.GONE);
-                        mProgressBar.setVisibility(View.VISIBLE);
-                    }
-                    c.close();
-                }
                 getLoaderManager().restartLoader(LOADER_ID_REFRESH_MAIN_DATA,
                         null,
                         WhooLiteActivityBaseFragment.this).forceLoad();
-                getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, WhooLiteActivityBaseFragment.this);
+                sectionChanged();
             }
         }
     };
@@ -145,9 +126,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                         mProgressTitle,
                         getString(R.string.please_wait));
             }
-            mMainDataWhere = savedInstanceState.getString(INSTANCE_STATE_MAIN_DATA_WHERE);
-            mMainDataSortOrder = savedInstanceState.getString(INSTANCE_STATE_MAIN_DATA_SORT_ORDER);
         }
+        mRealm = Realm.getDefaultInstance();
         setSectionId(prefs.getString(PreferenceKeys.CURRENT_SECTION_ID, null));
         mProgressBar = (ProgressBar) view.findViewById(R.id.progress);
         mEmptyLayout = (LinearLayout) view.findViewById(R.id.empty_layout);
@@ -165,7 +145,16 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             }
         });
         getActivity().registerReceiver(mReceiver, new IntentFilter(Actions.SECTION_ID_CHANGED));
-        getLoaderManager().initLoader(LOADER_ID_ACCOUNT, null, this);
+        mAccountQuery = mRealm.where(Account.class).equalTo("sectionId", mSectionId);
+        mAccounts = mAccountQuery.findAll();
+        mAccounts.addChangeListener(new RealmChangeListener<RealmResults<Account>>() {
+            @Override
+            public void onChange(RealmResults<Account> element) {
+                if (WhooLiteActivityBaseFragment.this.isAdded()) {
+                    mainDataChanged();
+                }
+            }
+        });
         getLoaderManager().initLoader(LOADER_ID_DELETE_SELECTED_ITEMS, null, this);
 
         return view;
@@ -176,6 +165,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         super.onDestroyView();
 
         getActivity().unregisterReceiver(mReceiver);
+        mAccounts.removeChangeListeners();
+        mRealm.close();
     }
 
     @Override
@@ -185,7 +176,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         if (mActionMode == null && mSectionId != null && getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) == null) {
             getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA, null, this).forceLoad();
         }
-        getLoaderManager().initLoader(LOADER_ID_MAIN_DATA, null, this);
     }
 
     @Override
@@ -206,68 +196,15 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 outState.putString(INSTANCE_STATE_PROGRESS_TITLE, mProgressTitle);
             }
         }
-        outState.putString(INSTANCE_STATE_MAIN_DATA_WHERE, mMainDataWhere);
-        outState.putString(INSTANCE_STATE_MAIN_DATA_SORT_ORDER, mMainDataSortOrder);
-    }
-
-    @Override
-    public Loader onCreateLoader(int id, Bundle args) {
-        switch (id) {
-            case LOADER_ID_MAIN_DATA: {
-                return new CursorLoader(getActivity(),
-                        getMainDataUri(),
-                        null,
-                        mMainDataWhere,
-                        null,
-                        mMainDataSortOrder);
-            }
-            case LOADER_ID_ACCOUNT: {
-                return new CursorLoader(getActivity(),
-                        WhooingProvider.getAccountsUri(mSectionId),
-                        null,
-                        null,
-                        null,
-                        null);
-            }
-            default: {
-                return null;
-            }
-        }
     }
 
     @Override
     public void onLoadFinished(Loader loader, Object data) {
         switch (loader.getId()) {
-            case LOADER_ID_MAIN_DATA: {
-                Cursor cursor = (Cursor) data;
-                WhooLiteAdapter adapter = (WhooLiteAdapter) mRecyclerView.getAdapter();
-
-                if (adapter == null) {
-                    mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(),
-                            getResources().getInteger(R.integer.input_item_span_count)));
-                    mRecyclerView.setAdapter(createAdapter((GridLayoutManager) mRecyclerView.getLayoutManager(),
-                            cursor));
-                } else {
-                    adapter.changeCursor(cursor);
-                }
-                if (cursor.getCount() > 0) {;
-                    mRecyclerView.setVisibility(View.VISIBLE);
-                    mEmptyLayout.setVisibility(View.GONE);
-                } else {
-                    mRecyclerView.setVisibility(View.GONE);
-                    mEmptyLayout.setVisibility(View.VISIBLE);
-                }
-                break;
-            }
-            case LOADER_ID_ACCOUNT: {
-                getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, this);
-                break;
-            }
             case LOADER_ID_DELETE_SELECTED_ITEMS: {
                 if (mProgressDialog != null) {
                     mProgressDialog.dismiss();
                 }
-                getLoaderManager().getLoader(LOADER_ID_MAIN_DATA).startLoading();
 
                 int code = (Integer) data;
 
@@ -359,26 +296,17 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     protected void setSectionId(String sectionId) {
         if (sectionId != null) {
             mSectionId = sectionId;
+            mAccountQuery = mRealm.where(Account.class).equalTo("sectionId", mSectionId);
 
-            Cursor c = getActivity().getContentResolver().query(WhooingProvider.getSectionUri(sectionId),
-                    null,
-                    null,
-                    null,
-                    null);
+            Section section = Realm.getDefaultInstance().where(Section.class).equalTo("sectionId", sectionId).findFirst();
 
-            if (c != null) {
-                c.moveToFirst();
-                getSectionDataFromCursor(c);
-                c.close();
-            } else {
-                getSectionDataFromCursor(null);
-            }
+            getDataFromSection(section);
         }
     }
 
-    protected void getSectionDataFromCursor(Cursor cursor) {
-        if (cursor != null) {
-            mCurrency = Currency.getInstance(cursor.getString(Sections.COLUMN_INDEX_CURRENCY));
+    protected void getDataFromSection(Section section) {
+        if (section != null) {
+            mCurrency = Currency.getInstance(section.getCurrency());
         } else {
             mCurrency = null;
         }
@@ -403,7 +331,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         mProgressDialog = ProgressDialog.show(getActivity(),
                 mProgressTitle,
                 getString(R.string.please_wait));
-        getLoaderManager().getLoader(LOADER_ID_MAIN_DATA).stopLoading();
 
         Bundle args = new Bundle();
 
@@ -415,6 +342,25 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         loader.args = args;
         loader.forceLoad();
+    }
+
+    protected void mainDataChanged() {
+        WhooLiteAdapter adapter = (WhooLiteAdapter) mRecyclerView.getAdapter();
+
+        if (adapter == null) {
+            mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(),
+                    getResources().getInteger(R.integer.input_item_span_count)));
+            mRecyclerView.setAdapter(createAdapter((GridLayoutManager) mRecyclerView.getLayoutManager()));
+        } else {
+            adapter.refresh();
+        }
+        if (getDataCount() > 0) {
+            mRecyclerView.setVisibility(View.VISIBLE);
+            mEmptyLayout.setVisibility(View.GONE);
+        } else {
+            mRecyclerView.setVisibility(View.GONE);
+            mEmptyLayout.setVisibility(View.VISIBLE);
+        }
     }
 
     protected class SectionViewHolder extends RecyclerView.ViewHolder {
@@ -457,28 +403,26 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         private TextDrawable.IBuilder mIconBuilder;
 
-        private int[] mSectionData;
-        private int[] mSectionDataCounts;
-
-        protected Cursor mCursor;
-
-        protected int mColumnIndexTitle;
-        protected int mColumnIndexMoney;
-        protected int mColumnIndexLeftAccountType;
-        protected int mColumnIndexRightAccountType;
-        protected int mColumnIndexItemId;
+        protected String[] mSectionTitles;
+        protected int[] mSectionDataCounts;
         protected int mItemLayoutId;
 
         abstract protected ItemViewHolder createItemViewHolder(View itemView);
-        abstract protected void itemClicked(View view, Cursor cursor);
-        abstract protected Uri getSectionDataUri();
-        abstract protected String getSectionText(int sectionData);
-        abstract protected String getSelectionId(int cursorPosition);
+        abstract protected void itemClicked(View view, int dataPosition);
+        abstract protected String getSelectionId(int dataPosition);
+        abstract protected String getTitle(int dataPosition);
+        abstract protected double getMoney(int dataPosition);
+        abstract protected String getLeftAccountType(int dataPosition);
+        abstract protected String getLeftAccountId(int dataPosition);
+        abstract protected String getRightAccountType(int dataPosition);
+        abstract protected String getRightAccountId(int dataPosition);
+        abstract protected long getValueForItemId(int dataPosition);
+        abstract protected void refreshSections();
 
-        public WhooLiteAdapter(final GridLayoutManager gridLayoutManager, Cursor cursor) {
+        public WhooLiteAdapter(final GridLayoutManager gridLayoutManager) {
             super();
 
-            changeCursor(cursor);
+            refreshSections();
             mIconBuilder = TextDrawable.builder().round();
             setHasStableIds(true);
             gridLayoutManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
@@ -519,8 +463,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                             ItemViewHolder vh = (ItemViewHolder) v.getTag();
 
                             if (mActionMode == null) {
-                                mCursor.moveToPosition(getCursorPosition(vh.getAdapterPosition()));
-                                itemClicked(v, mCursor);
+                                itemClicked(v, getDataPosition(vh.getAdapterPosition()));
                             } else {
                                 toggleSelect(vh);
                             }
@@ -571,7 +514,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                         if (position <= sum + i) {
                             SectionViewHolder vh = (SectionViewHolder) holder;
 
-                            vh.name.setText(getSectionText(mSectionData[i]));
+                            vh.name.setText(mSectionTitles[i]);
                             break;
                         }
                         sum += mSectionDataCounts[i];
@@ -581,13 +524,22 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 case VIEW_TYPE_ITEM: {
                     ItemViewHolder vh = (ItemViewHolder) holder;
 
-                    position = getCursorPosition(position);
-                    mCursor.moveToPosition(position);
+                    position = getDataPosition(position);
 
-                    String title = mCursor.getString(mColumnIndexTitle);
-                    double money = mCursor.getDouble(mColumnIndexMoney);
-                    String leftAccountType = mCursor.getString(mColumnIndexLeftAccountType);
-                    String rightAccountType = mCursor.getString(mColumnIndexRightAccountType);
+                    String title = getTitle(position);
+                    double money = getMoney(position);
+                    String leftAccountType = getLeftAccountType(position);
+                    String rightAccountType = getRightAccountType(position);
+                    Account leftAccount = mAccountQuery.findAll().where()
+                            .equalTo("accountType", leftAccountType)
+                            .equalTo("accountId", getLeftAccountId(position))
+                            .findFirst();
+                    Account rightAccount = mAccountQuery.findAll().where()
+                            .equalTo("accountType", rightAccountType)
+                            .equalTo("accountId", getRightAccountId(position))
+                            .findFirst();
+                    String leftAccountTitle = leftAccount == null ? null : leftAccount.getTitle();
+                    String rightAccountTitle = rightAccount == null ? null : rightAccount.getTitle();
 
                     if (mActionMode != null && mSelectedItems.contains(getSelectionId(position))) {
                         vh.icon.setImageResource(R.drawable.ic_check);
@@ -608,50 +560,50 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                     if (money < WhooingKeyValues.EPSILON) {
                         vh.money.setText(R.string.not_assigned);
                     } else {
-                        vh.money.setText(getString(R.string.currency_format,
-                                mCurrency.getSymbol(),
-                                NumberFormat.getInstance().format(money)));
+                        if (mCurrency == null) {
+                            vh.money.setText(R.string.unknown);
+                        } else {
+                            vh.money.setText(getString(R.string.currency_format,
+                                    mCurrency.getSymbol(),
+                                    NumberFormat.getInstance().format(money)));
+                        }
                     }
                     if (TextUtils.isEmpty(leftAccountType)) {
                         vh.left.setText(R.string.not_assigned);
                     } else {
-                        String leftTitle = mCursor.getString(mCursor.getColumnCount() - 2);
-
-                        if (TextUtils.isEmpty(leftTitle)) {
+                        if (TextUtils.isEmpty(leftAccountTitle)) {
                             vh.left.setText(R.string.unknown);
                         } else {
                             switch (leftAccountType) {
                                 case WhooingKeyValues.ASSETS: {
-                                    leftTitle += "+";
+                                    leftAccountTitle += "+";
                                     break;
                                 }
                                 case WhooingKeyValues.LIABILITIES:case WhooingKeyValues.CAPITAL: {
-                                    leftTitle += "-";
+                                    leftAccountTitle += "-";
                                     break;
                                 }
                             }
-                            vh.left.setText(leftTitle);
+                            vh.left.setText(leftAccountTitle);
                         }
                     }
                     if (TextUtils.isEmpty(rightAccountType)) {
                         vh.right.setText(R.string.not_assigned);
                     } else {
-                        String rightTitle = mCursor.getString(mCursor.getColumnCount() - 1);
-
-                        if (TextUtils.isEmpty(rightTitle)) {
+                        if (TextUtils.isEmpty(rightAccountTitle)) {
                             vh.left.setText(R.string.unknown);
                         } else {
                             switch (rightAccountType) {
                                 case WhooingKeyValues.ASSETS: {
-                                    rightTitle += "-";
+                                    rightAccountTitle += "-";
                                     break;
                                 }
                                 case WhooingKeyValues.LIABILITIES:case WhooingKeyValues.CAPITAL: {
-                                    rightTitle += "+";
+                                    rightAccountTitle += "+";
                                     break;
                                 }
                             }
-                            vh.right.setText(rightTitle);
+                            vh.right.setText(rightAccountTitle);
                         }
                     }
                     break;
@@ -662,14 +614,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         @Override
         public int getItemCount() {
-            if (mCursor == null) {
-                return 0;
-            }
-            if (mSectionData == null) {
-                return mCursor.getCount();
-            } else {
-                return mCursor.getCount() + mSectionData.length;
-            }
+            return getDataCount() + mSectionTitles.length;
         }
 
         @Override
@@ -680,7 +625,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
                     for (int i = 0; i < mSectionDataCounts.length; i++) {
                         if (position <= sum + i) {
-                            return ("section:" + mSectionData[i]).hashCode();
+                            return ("section:" + mSectionTitles[i]).hashCode();
                         }
                         sum += mSectionDataCounts[i];
                     }
@@ -688,9 +633,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                     return -1;
                 }
                 case VIEW_TYPE_ITEM: {
-                    mCursor.moveToPosition(getCursorPosition(position));
-
-                    return mCursor.getString(mColumnIndexItemId).hashCode();
+                    return getValueForItemId(getDataPosition(position));
                 }
                 default: {
                     return -1;
@@ -700,7 +643,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         @Override
         public int getItemViewType(int position) {
-            if (mSectionData == null) {
+            if (mSectionTitles == null) {
                 return VIEW_TYPE_ITEM;
             }
 
@@ -718,38 +661,12 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             return VIEW_TYPE_ITEM;
         }
 
-        public void changeCursor(Cursor cursor) {
-            mCursor = cursor;
-
-            Cursor c = getActivity().getContentResolver().query(getSectionDataUri(),
-                    null,
-                    mMainDataWhere,
-                    null,
-                    null);
-
-            if (c != null) {
-                if (c.moveToFirst()) {
-                    if (c.getCount() > 1) {
-                        int i = 0;
-
-                        mSectionData = new int[c.getCount()];
-                        mSectionDataCounts = new int[c.getCount()];
-                        do {
-                            mSectionData[i] = c.getInt(0);
-                            mSectionDataCounts[i] = c.getInt(1);
-                            i++;
-                        } while (c.moveToNext());
-                    } else {
-                        mSectionData = null;
-                        mSectionDataCounts = null;
-                    }
-                }
-                c.close();
-            }
+        public void refresh() {
+            refreshSections();
             notifyDataSetChanged();
         }
 
-        protected int getCursorPosition(int position) {
+        protected int getDataPosition(int position) {
             int sum = 0;
 
             if (mSectionDataCounts != null) {
@@ -772,13 +689,13 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             } else {
                 mSelectedItems.clear();
             }
-            mSelectedItems.add(getSelectionId(getCursorPosition(vh.getAdapterPosition())));
+            mSelectedItems.add(getSelectionId(getDataPosition(vh.getAdapterPosition())));
             mActionMode = ((AppCompatActivity) getActivity()).startSupportActionMode(WhooLiteActivityBaseFragment.this);
         }
 
         private void toggleSelect(ItemViewHolder vh) {
             int position = vh.getAdapterPosition();
-            int cursorPosition = getCursorPosition(position);
+            int cursorPosition = getDataPosition(position);
             String selectionId = getSelectionId(cursorPosition);
 
             if (mSelectedItems.contains(selectionId)) {

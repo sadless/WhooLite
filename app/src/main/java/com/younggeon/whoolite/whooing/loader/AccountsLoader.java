@@ -1,6 +1,5 @@
 package com.younggeon.whoolite.whooing.loader;
 
-import android.content.ContentValues;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
@@ -8,8 +7,7 @@ import android.os.Bundle;
 import com.android.volley.Request;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
-import com.younggeon.whoolite.db.schema.Accounts;
-import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Account;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -23,6 +21,10 @@ import java.util.Locale;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import io.realm.Realm;
+import io.realm.RealmQuery;
+import io.realm.RealmResults;
 
 /**
  * Created by sadless on 2016. 1. 27..
@@ -61,7 +63,9 @@ public class AccountsLoader extends WhooingBaseLoader {
                         JSONObject accounts = result.optJSONObject(WhooingKeyValues.RESULT);
                         Iterator<String> keys = accounts.keys();
                         int sortOrder = 0;
-                        ArrayList<ContentValues> values = new ArrayList<>();
+                        Realm realm = Realm.getDefaultInstance();
+                        ArrayList<Account> objects = new ArrayList<>();
+                        RealmQuery<Account> query = realm.where(Account.class).equalTo("sectionId", sectionId);
 
                         while (keys.hasNext()) {
                             String accountType = keys.next();
@@ -69,23 +73,28 @@ public class AccountsLoader extends WhooingBaseLoader {
 
                             for (int i = 0; i < itemsInAccountType.length(); i++, sortOrder++) {
                                 JSONObject accountItem = itemsInAccountType.optJSONObject(i);
-                                ContentValues cv = new ContentValues();
+                                Account object = new Account();
 
-                                cv.put(Accounts.COLUMN_ACCOUNT_TYPE, accountType);
-                                cv.put(Accounts.COLUMN_ACCOUNT_ID, accountItem.optString(WhooingKeyValues.ACCOUNT_ID));
-                                cv.put(Accounts.COLUMN_TITLE, accountItem.optString(WhooingKeyValues.TITLE));
-                                cv.put(Accounts.COLUMN_MEMO, accountItem.optString(WhooingKeyValues.MEMO));
-                                cv.put(Accounts.COLUMN_IS_GROUP, accountItem.optString(WhooingKeyValues.TYPE).equals(GROUP));
-                                cv.put(Accounts.COLUMN_SORT_ORDER, sortOrder);
-                                values.add(cv);
-                                sortOrder++;
+                                object.setSectionId(sectionId);
+                                object.setAccountType(accountType);
+                                object.setAccountId(accountItem.optString(WhooingKeyValues.ACCOUNT_ID));
+                                object.setTitle(accountItem.optString(WhooingKeyValues.TITLE));
+                                object.setMemo(accountItem.optString(WhooingKeyValues.MEMO));
+                                object.setGroup(accountItem.optString(WhooingKeyValues.TYPE).equals(GROUP));
+                                object.setSortOrder(sortOrder);
+                                object.composePrimaryKey();
+                                query.notEqualTo("primaryKey", object.getPrimaryKey());
+                                objects.add(object);
                             }
                         }
 
-                        ContentValues[] valuesArray = new ContentValues[values.size()];
+                        RealmResults<Account> willDeleteAccounts = query.findAll();
 
-                        getContext().getContentResolver().bulkInsert(WhooingProvider.getAccountsUri(sectionId),
-                                values.toArray(valuesArray));
+                        realm.beginTransaction();
+                        realm.copyToRealmOrUpdate(objects);
+                        willDeleteAccounts.deleteAllFromRealm();
+                        realm.commitTransaction();
+                        realm.close();
                     }
                 } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
                     e.printStackTrace();

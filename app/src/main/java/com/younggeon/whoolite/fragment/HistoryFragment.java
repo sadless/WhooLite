@@ -3,8 +3,6 @@ package com.younggeon.whoolite.fragment;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.database.Cursor;
-import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
@@ -25,10 +23,9 @@ import com.android.volley.Request;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.activity.HistoryDetailActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
-import com.younggeon.whoolite.db.schema.Entries;
 import com.younggeon.whoolite.db.schema.FrequentItems;
-import com.younggeon.whoolite.db.schema.Sections;
-import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Entry;
+import com.younggeon.whoolite.realm.Section;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.EntriesLoader;
 import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
@@ -37,6 +34,11 @@ import com.younggeon.whoolite.whooing.loader.WhooingBaseLoader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
+
+import io.realm.RealmChangeListener;
+import io.realm.RealmQuery;
+import io.realm.RealmResults;
+import io.realm.Sort;
 
 /**
  * Created by sadless on 2016. 1. 17..
@@ -49,8 +51,17 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     private String[] mSlotNumberItems;
     private SimpleDateFormat mEntryDateFormat;
     private SimpleDateFormat mSectionDateFormat;
+    private RealmQuery<Entry> mQuery;
+    private RealmResults<Entry> mEntries;
 
     private AlertDialog mSelectSlotNumberDialog;
+
+    private RealmChangeListener<RealmResults<Entry>> mDataChangeListener = new RealmChangeListener<RealmResults<Entry>>() {
+        @Override
+        public void onChange(RealmResults<Entry> element) {
+            mainDataChanged();
+        }
+    };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -60,27 +71,37 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         mNoDataStringId = R.string.no_entries;
         mDeleteConfirmStringId = R.string.delete_entries_confirm;
         mActionMenuId = R.menu.action_menu_history;
-        mMainDataSortOrder = Entries.COLUMN_ENTRY_DATE + " DESC";
     }
 
     @Override
-    protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager, Cursor cursor) {
-        return new HistoryAdapter(layoutManager, cursor);
-    }
+    protected void getDataFromSection(Section section) {
+        super.getDataFromSection(section);
 
-    @Override
-    protected Uri getMainDataUri() {
-        return WhooingProvider.getEntriesUri(mSectionId);
-    }
-
-    @Override
-    protected void getSectionDataFromCursor(Cursor cursor) {
-        super.getSectionDataFromCursor(cursor);
-
-        if (cursor != null) {
+        if (section != null) {
             mSectionDateFormat = Utility.getDateFormatFromWhooingDateFormat(
-                    cursor.getString(Sections.COLUMN_INDEX_DATE_FORMAT));
+                    section.getDateFormat());
         }
+    }
+
+    @Override
+    protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager) {
+        return new HistoryAdapter(layoutManager);
+    }
+
+    @Override
+    protected int getDataCount() {
+        return mEntries.size();
+    }
+
+    @Override
+    protected void sectionChanged() {
+        mQuery = mRealm.where(Entry.class).equalTo("sectionId", mSectionId);
+        if (mEntries != null) {
+            mEntries.removeChangeListeners();
+        }
+        mEntries = mQuery.findAllSorted("entryDate", Sort.DESCENDING).sort("sortOrder", Sort.DESCENDING);
+        mEntries.addChangeListener(mDataChangeListener);
+        mainDataChanged();
     }
 
     @Override
@@ -94,6 +115,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         }
         mEntryDateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
         getLoaderManager().initLoader(LOADER_ID_BOOKMARK_SELECTED_ITEMS, null, this);
+        sectionChanged();
 
         return view;
     }
@@ -130,7 +152,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                         bundle);
             }
             default: {
-                return super.onCreateLoader(id, args);
+                return null;
             }
         }
     }
@@ -144,7 +166,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                 if (mProgressDialog != null) {
                     mProgressDialog.dismiss();
                 }
-                getLoaderManager().getLoader(LOADER_ID_MAIN_DATA).startLoading();
+                mEntries.addChangeListener(mDataChangeListener);
 
                 int code = (Integer) data;
 
@@ -217,7 +239,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         mProgressDialog = ProgressDialog.show(getActivity(),
                 mProgressTitle,
                 getString(R.string.please_wait));
-        getLoaderManager().getLoader(LOADER_ID_MAIN_DATA).stopLoading();
+        mEntries.removeChangeListeners();
 
         Bundle args = new Bundle();
 
@@ -243,14 +265,9 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     }
 
     private class HistoryAdapter extends WhooLiteAdapter {
-        public HistoryAdapter(GridLayoutManager gridLayoutManager, Cursor cursor) {
-            super(gridLayoutManager, cursor);
+        public HistoryAdapter(GridLayoutManager gridLayoutManager) {
+            super(gridLayoutManager);
 
-            mColumnIndexTitle = Entries.COLUMN_INDEX_TITLE;
-            mColumnIndexMoney = Entries.COLUMN_INDEX_MONEY;
-            mColumnIndexLeftAccountType = Entries.COLUMN_INDEX_LEFT_ACCOUNT_TYPE;
-            mColumnIndexRightAccountType = Entries.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE;
-            mColumnIndexItemId = Entries.COLUMN_INDEX_ENTRY_ID;
             mItemLayoutId = R.layout.recycler_item_entry;
         }
 
@@ -260,13 +277,18 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         }
 
         @Override
-        protected void itemClicked(View view, Cursor cursor) {
+        protected String getSelectionId(int dataPosition) {
+            return "" + mEntries.get(dataPosition).getEntryId();
+        }
+
+        @Override
+        protected void itemClicked(View view, int dataPosition) {
             Intent intent = new Intent(getActivity(),
                     HistoryDetailActivity.class);
 
             intent.putExtra(HistoryDetailActivity.EXTRA_SECTION_ID, mSectionId);
             intent.putExtra(HistoryDetailActivity.EXTRA_ENTRY_ID,
-                    cursor.getLong(Entries.COLUMN_INDEX_ENTRY_ID));
+                    mEntries.get(dataPosition).getEntryId());
             ActivityCompat.startActivity(getActivity(),
                     intent,
                     ActivityOptionsCompat.makeScaleUpAnimation(view,
@@ -278,26 +300,65 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         }
 
         @Override
-        protected Uri getSectionDataUri() {
-            return WhooingProvider.getEntriesDateCountsUri(mSectionId);
+        protected String getTitle(int dataPosition) {
+            return mEntries.get(dataPosition).getTitle();
         }
 
         @Override
-        protected String getSectionText(int sectionData) {
-            try {
-                return mSectionDateFormat.format(mEntryDateFormat.parse("" + sectionData));
-            } catch (ParseException e) {
-                e.printStackTrace();
+        protected double getMoney(int dataPosition) {
+            return mEntries.get(dataPosition).getMoney();
+        }
 
-                return null;
+        @Override
+        protected String getLeftAccountType(int dataPosition) {
+            return mEntries.get(dataPosition).getLeftAccountType();
+        }
+
+        @Override
+        protected String getLeftAccountId(int dataPosition) {
+            return mEntries.get(dataPosition).getLeftAccountId();
+        }
+
+        @Override
+        protected String getRightAccountType(int dataPosition) {
+            return mEntries.get(dataPosition).getRightAccountType();
+        }
+
+        @Override
+        protected String getRightAccountId(int dataPosition) {
+            return mEntries.get(dataPosition).getRightAccountId();
+        }
+
+        @Override
+        protected long getValueForItemId(int dataPosition) {
+            return mEntries.get(dataPosition).getEntryId();
+        }
+
+        @Override
+        protected void refreshSections() {
+            RealmResults<Entry> items = mQuery.findAllSorted("entryDate", Sort.DESCENDING).sort("sortOrder", Sort.DESCENDING);
+            RealmResults<Entry> dates = items.distinct("entryDate");
+
+            mSectionTitles = new String[dates.size()];
+            mSectionDataCounts = new int[dates.size()];
+
+            int i = 0;
+
+            for (Entry item : items) {
+                int entryDate = item.getEntryDate();
+                if (mEntryDateFormat != null && mSectionDateFormat != null) {
+                    try {
+                        mSectionTitles[i] = mSectionDateFormat.format(mEntryDateFormat.parse("" + entryDate));
+                    } catch (ParseException e) {
+                        e.printStackTrace();
+                        mSectionTitles[i] = "";
+                    }
+                } else {
+                    mSectionTitles[i] = "";
+                }
+                mSectionDataCounts[i] = mQuery.findAll().where().equalTo("entryDate", entryDate).findAll().size();
+                i++;
             }
-        }
-
-        @Override
-        protected String getSelectionId(int cursorPosition) {
-            mCursor.moveToPosition(cursorPosition);
-
-            return "" + mCursor.getLong(Entries.COLUMN_INDEX_ENTRY_ID);
         }
 
         @Override
@@ -306,7 +367,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
             switch (getItemViewType(position)) {
                 case VIEW_TYPE_ITEM: {
                     HistoryItemViewHolder viewHolder = (HistoryItemViewHolder) holder;
-                    String memo = mCursor.getString(Entries.COLUMN_INDEX_MEMO);
+                    String memo = mEntries.get(getDataPosition(position)).getMemo();
 
                     if (TextUtils.isEmpty(memo)) {
                         viewHolder.memo.setVisibility(View.GONE);

@@ -14,10 +14,14 @@ import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.activity.WelcomeActivity;
 import com.younggeon.whoolite.constant.Actions;
 import com.younggeon.whoolite.constant.PreferenceKeys;
-import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Account;
+import com.younggeon.whoolite.realm.FrequentItem;
+import com.younggeon.whoolite.realm.Section;
 
 import java.text.SimpleDateFormat;
 import java.util.Locale;
+
+import io.realm.Realm;
 
 /**
  * Created by sadless on 2015. 10. 19..
@@ -44,13 +48,16 @@ public class Utility {
     }
 
     public static void logout(Context context) {
+        Realm realm = Realm.getDefaultInstance();
+
         PreferenceManager.getDefaultSharedPreferences(context).edit()
                 .remove(PreferenceKeys.API_KEY_FORMAT)
                 .remove(PreferenceKeys.CURRENT_SECTION_ID)
                 .remove(context.getString(R.string.pref_key_show_slot_numbers)).apply();
-        context.getContentResolver().delete(WhooingProvider.getSectionsUri(),
-                null,
-                null);
+        realm.delete(Section.class);
+        realm.delete(Account.class);
+        realm.delete(FrequentItem.class);
+        realm.close();
         context.sendBroadcast(new Intent(Actions.FINISH));
         context.startActivity(new Intent(context, WelcomeActivity.class));
     }

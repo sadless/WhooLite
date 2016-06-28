@@ -1,6 +1,5 @@
 package com.younggeon.whoolite.whooing.loader;
 
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
@@ -12,16 +11,20 @@ import com.android.volley.toolbox.RequestFuture;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
-import com.younggeon.whoolite.db.schema.Sections;
-import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Section;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import io.realm.Realm;
+import io.realm.RealmQuery;
+import io.realm.RealmResults;
 
 /**
  * Created by sadless on 2016. 1. 26..
@@ -81,21 +84,32 @@ public class SectionsLoader extends WhooingBaseLoader {
 
                     if ((resultCode = result.optInt(WhooingKeyValues.CODE)) == WhooingKeyValues.SUCCESS) {
                         JSONArray sections = result.optJSONArray(WhooingKeyValues.RESULT);
-                        ContentValues[] values = new ContentValues[sections.length()];
+                        Realm realm = Realm.getDefaultInstance();
+                        ArrayList<Section> objects = new ArrayList<>();
+                        RealmQuery<Section> query = realm.where(Section.class);
 
                         for (int i = 0; i < sections.length(); i++) {
                             JSONObject section = sections.optJSONObject(i);
+                            Section object = new Section();
+                            String sectionId = section.optString(WhooingKeyValues.SECTION_ID);
 
-                            values[i] = new ContentValues();
-                            values[i].put(Sections.COLUMN_SECTION_ID, section.optString(WhooingKeyValues.SECTION_ID));
-                            values[i].put(Sections.COLUMN_TITLE, section.optString(WhooingKeyValues.TITLE));
-                            values[i].put(Sections.COLUMN_MEMO, section.optString(WhooingKeyValues.MEMO));
-                            values[i].put(Sections.COLUMN_CURRENCY, section.optString(WhooingKeyValues.CURRENCY));
-                            values[i].put(Sections.COLUMN_DATE_FORMAT, section.optString(WhooingKeyValues.DATE_FORMAT));
-                            values[i].put(Sections.COLUMN_SORT_ORDER, i);
+                            object.setSectionId(sectionId);
+                            object.setTitle(section.optString(WhooingKeyValues.TITLE));
+                            object.setMemo(section.optString(WhooingKeyValues.MEMO));
+                            object.setCurrency(section.optString(WhooingKeyValues.CURRENCY));
+                            object.setDateFormat(section.optString(WhooingKeyValues.DATE_FORMAT));
+                            object.setSortOrder(i);
+                            objects.add(object);
+                            query = query.notEqualTo("sectionId", sectionId);
                         }
-                        getContext().getContentResolver().bulkInsert(WhooingProvider.getSectionsUri(),
-                                values);
+
+                        RealmResults<Section> willDeleteSections = query.findAll();
+                        
+                        realm.beginTransaction();
+                        realm.copyToRealmOrUpdate(objects);
+                        willDeleteSections.deleteAllFromRealm();
+                        realm.commitTransaction();
+                        realm.close();
                     }
                 } catch (JSONException | InterruptedException | ExecutionException | TimeoutException e) {
                     e.printStackTrace();

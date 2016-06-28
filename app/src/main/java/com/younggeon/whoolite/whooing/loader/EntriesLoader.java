@@ -13,6 +13,7 @@ import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.Entries;
 import com.younggeon.whoolite.db.schema.FrequentItems;
 import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Entry;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -23,6 +24,10 @@ import java.util.Date;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import io.realm.Realm;
+import io.realm.RealmQuery;
+import io.realm.RealmResults;
 
 /**
  * Created by sadless on 2015. 11. 8..
@@ -233,24 +238,39 @@ public class EntriesLoader extends WhooingBaseLoader {
 
                     if ((resultCode = result.optInt(WhooingKeyValues.CODE)) == WhooingKeyValues.SUCCESS) {
                         JSONArray entries = result.optJSONArray(WhooingKeyValues.RESULT);
-                        ContentValues[] values = new ContentValues[entries.length()];
+                        Realm realm = Realm.getDefaultInstance();
+                        ArrayList<Entry> objects = new ArrayList<>();
+                        RealmQuery<Entry> query = realm.where(Entry.class).equalTo("sectionId", sectionId);
 
                         for (int i = 0; i < entries.length(); i++) {
                             JSONObject entry = entries.optJSONObject(i);
+                            Entry object = new Entry();
+                            double entryDate = entry.optDouble(WhooingKeyValues.ENTRY_DATE);
 
-                            values[i] = new ContentValues();
-                            values[i].put(Entries.COLUMN_ENTRY_ID, entry.optLong(WhooingKeyValues.ENTRY_ID));
-                            values[i].put(Entries.COLUMN_TITLE, entry.optString(WhooingKeyValues.ITEM_TITLE));
-                            values[i].put(Entries.COLUMN_MONEY, entry.optDouble(WhooingKeyValues.MONEY));
-                            values[i].put(Entries.COLUMN_LEFT_ACCOUNT_TYPE, entry.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
-                            values[i].put(Entries.COLUMN_LEFT_ACCOUNT_ID, entry.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
-                            values[i].put(Entries.COLUMN_RIGHT_ACCOUNT_TYPE, entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
-                            values[i].put(Entries.COLUMN_RIGHT_ACCOUNT_ID, entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
-                            values[i].put(Entries.COLUMN_MEMO, entry.optString(WhooingKeyValues.MEMO));
-                            values[i].put(Entries.COLUMN_ENTRY_DATE, entry.optDouble(WhooingKeyValues.ENTRY_DATE));
+                            object.setSectionId(sectionId);
+                            object.setEntryId(entry.optLong(WhooingKeyValues.ENTRY_ID));
+                            object.setTitle(entry.optString(WhooingKeyValues.ITEM_TITLE));
+                            object.setMoney(entry.optDouble(WhooingKeyValues.MONEY));
+                            object.setLeftAccountType(entry.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
+                            object.setLeftAccountId(entry.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
+                            object.setRightAccountType(entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
+                            object.setRightAccountId(entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
+                            object.setMemo(entry.optString(WhooingKeyValues.MEMO));
+                            object.setEntryDate((int)entryDate);
+                            entryDate -= (int) entryDate;
+                            object.setSortOrder((int)(entryDate * 10000));
+                            object.composePrimaryKey();
+                            query.notEqualTo("primaryKey", object.getPrimaryKey());
+                            objects.add(object);
                         }
-                        getContext().getContentResolver().bulkInsert(WhooingProvider.getEntriesUri(sectionId),
-                                values);
+
+                        RealmResults<Entry> willDeleteEntries = query.findAll();
+
+                        realm.beginTransaction();
+                        realm.copyToRealmOrUpdate(objects);
+                        willDeleteEntries.deleteAllFromRealm();
+                        realm.commitTransaction();
+                        realm.close();
                     }
                 } catch (JSONException | InterruptedException | ExecutionException | TimeoutException e) {
                     e.printStackTrace();

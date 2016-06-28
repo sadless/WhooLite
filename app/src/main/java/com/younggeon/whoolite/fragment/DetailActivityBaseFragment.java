@@ -1,14 +1,12 @@
 package com.younggeon.whoolite.fragment;
 
 import android.app.ProgressDialog;
-import android.database.Cursor;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
-import android.support.v4.content.CursorLoader;
 import android.support.v4.content.Loader;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -23,17 +21,20 @@ import android.widget.TextView;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
-import com.younggeon.whoolite.db.schema.Accounts;
-import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Account;
+
+import io.realm.Realm;
+import io.realm.RealmChangeListener;
+import io.realm.RealmQuery;
+import io.realm.RealmResults;
+import io.realm.Sort;
 
 /**
  * Created by sadless on 2016. 1. 18..
  */
 public abstract class DetailActivityBaseFragment extends Fragment implements LoaderManager.LoaderCallbacks {
-    protected static final int LOADER_ID_LEFT = 101;
-    protected static final int LOADER_ID_RIGHT = 102;
-    protected static final int LOADER_ID_DELETE = 103;
-    protected static final int LOADER_ID_SEND = 104;
+    protected static final int LOADER_ID_DELETE = 101;
+    protected static final int LOADER_ID_SEND = 102;
 
     private static final String INSTANCE_STATE_LEFT_ACCOUNT_TYPE = "left_account_type";
     private static final String INSTANCE_STATE_LEFT_ACCOUNT_ID = "left_account_id";
@@ -55,6 +56,12 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
     protected String mRightAccountId;
     protected String mItemId;
     protected int mLayoutId;
+
+    private Realm mRealm;
+    private RealmQuery<Account> mLeftQuery;
+    private RealmQuery<Account> mRightQuery;
+    private RealmResults<Account> mLeftAccounts;
+    private RealmResults<Account> mRightAccounts;
 
     abstract protected void initialize();
 
@@ -97,8 +104,28 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                 mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
             }
         }
-        getLoaderManager().initLoader(LOADER_ID_LEFT, null, this);
-        getLoaderManager().initLoader(LOADER_ID_RIGHT, null, this);
+
+        mRealm = Realm.getDefaultInstance();
+        mLeftQuery = mRealm.where(Account.class).equalTo("sectionId", mSectionId)
+                .notEqualTo("accountType", WhooingKeyValues.INCOME);
+        mLeftAccounts = mLeftQuery.findAllSorted("sortOrder", Sort.ASCENDING);
+        mLeftAccounts.addChangeListener(new RealmChangeListener<RealmResults<Account>>() {
+            @Override
+            public void onChange(RealmResults<Account> element) {
+                leftChanged();
+            }
+        });
+        leftChanged();
+        mRightQuery = mRealm.where(Account.class).equalTo("sectionId", mSectionId)
+                .notEqualTo("accountType", WhooingKeyValues.EXPENSES);
+        mRightAccounts = mRightQuery.findAllSorted("sortOrder", Sort.ASCENDING);
+        mRightAccounts.addChangeListener(new RealmChangeListener<RealmResults<Account>>() {
+            @Override
+            public void onChange(RealmResults<Account> element) {
+                rightChanged();
+            }
+        });
+        rightChanged();
         getLoaderManager().initLoader(LOADER_ID_DELETE, null, this);
         setHasOptionsMenu(true);
 
@@ -119,61 +146,11 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
     }
 
     @Override
-    public Loader onCreateLoader(int id, Bundle args) {
-        switch (id) {
-            case LOADER_ID_LEFT: {
-                return new CursorLoader(getActivity(),
-                        WhooingProvider.getAccountsUri(mSectionId),
-                        null,
-                        Accounts.COLUMN_ACCOUNT_TYPE + " != ?",
-                        new String[] {WhooingKeyValues.INCOME},
-                        Accounts.COLUMN_SORT_ORDER + " ASC");
-            }
-            case LOADER_ID_RIGHT: {
-                return new CursorLoader(getActivity(),
-                        WhooingProvider.getAccountsUri(mSectionId),
-                        null,
-                        Accounts.COLUMN_ACCOUNT_TYPE + " != ?",
-                        new String[] {WhooingKeyValues.EXPENSES},
-                        Accounts.COLUMN_SORT_ORDER + " ASC");
-            }
-            default: {
-                return null;
-            }
-        }
-    }
-
-    @Override
-    public void onLoadFinished(Loader loader, Object data) {
-        switch (loader.getId()) {
-            case LOADER_ID_LEFT: {
-                AccountsAdapter adapter = (AccountsAdapter) mLeft.getAdapter();
-
-                if (adapter == null) {
-                    adapter = new AccountsAdapter((Cursor) data, AccountsAdapter.DIRECTION_LEFT);
-                    mLeft.setAdapter(adapter);
-                } else {
-                    adapter.changeCursor((Cursor) data);
-                }
-                mLeft.setSelection(adapter.getSelection(mLeftAccountType, mLeftAccountId));
-                break;
-            }
-            case LOADER_ID_RIGHT: {
-                AccountsAdapter adapter = (AccountsAdapter) mRight.getAdapter();
-
-                if (adapter == null) {
-                    adapter = new AccountsAdapter((Cursor) data, AccountsAdapter.DIRECTION_RIGHT);
-                    mRight.setAdapter(adapter);
-                } else {
-                    adapter.changeCursor((Cursor) data);
-                }
-                mRight.setSelection(adapter.getSelection(mRightAccountType, mRightAccountId));
-                break;
-            }
-            default: {
-                break;
-            }
-        }
+    public void onDestroyView() {
+        super.onDestroyView();
+        mLeftAccounts.removeChangeListeners();
+        mRightAccounts.removeChangeListeners();
+        mRealm.close();
     }
 
     @Override
@@ -200,17 +177,17 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
             return;
         }
         if (position != adapter.getCount() - 1) {
-            Cursor c = adapter.getCursor(position);
+            Account account = adapter.getAccount(position);
 
             switch (direction) {
                 case AccountsAdapter.DIRECTION_LEFT: {
-                    mLeftAccountType = c.getString(Accounts.COLUMN_INDEX_ACCOUNT_TYPE);
-                    mLeftAccountId = c.getString(Accounts.COLUMN_INDEX_ACCOUNT_ID);
+                    mLeftAccountType = account.getAccountType();
+                    mLeftAccountId = account.getAccountId();
                     break;
                 }
                 case AccountsAdapter.DIRECTION_RIGHT: {
-                    mRightAccountType = c.getString(Accounts.COLUMN_INDEX_ACCOUNT_TYPE);
-                    mRightAccountId = c.getString(Accounts.COLUMN_INDEX_ACCOUNT_ID);
+                    mRightAccountType = account.getAccountType();
+                    mRightAccountId = account.getAccountId();
                     break;
                 }
                 default:
@@ -218,38 +195,74 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         }
     }
 
+    protected void leftChanged() {
+        AccountsAdapter adapter = (AccountsAdapter) mLeft.getAdapter();
+
+        if (adapter == null) {
+            adapter = new AccountsAdapter(AccountsAdapter.DIRECTION_LEFT);
+            mLeft.setAdapter(adapter);
+        } else {
+            adapter.notifyDataSetChanged();
+        }
+        mLeft.setSelection(adapter.getSelection(mLeftAccountType, mLeftAccountId));
+    }
+
+    protected void rightChanged() {
+        AccountsAdapter adapter = (AccountsAdapter) mRight.getAdapter();
+
+        if (adapter == null) {
+            adapter = new AccountsAdapter(AccountsAdapter.DIRECTION_RIGHT);
+            mRight.setAdapter(adapter);
+        } else {
+            adapter.notifyDataSetChanged();
+        }
+        mRight.setSelection(adapter.getSelection(mRightAccountType, mRightAccountId));
+    }
+
     protected class AccountsAdapter extends BaseAdapter {
         public static final int DIRECTION_LEFT = 1;
         public static final int DIRECTION_RIGHT = 2;
 
-        private Cursor mCursor;
         private int mDirection;
         private int mItemPadding;
         private int mTypePadding;
         private String[] mTypes;
         private int[] mTypeCounts;
 
-        public AccountsAdapter(Cursor cursor, int direction) {
+        public AccountsAdapter(int direction) {
             this.mDirection = direction;
-            setCursor(cursor);
+            refresh();
             mItemPadding = getResources().getDimensionPixelSize(R.dimen.account_item_padding);
             mTypePadding = getResources().getDimensionPixelSize(R.dimen.account_type_padding);
         }
 
         @Override
         public int getCount() {
-            if (mCursor != null) {
-                return mCursor.getCount() + mTypes.length + 2;
-            } else {
-                return 2;
+            switch (mDirection) {
+                case DIRECTION_LEFT: {
+                    return mLeftAccounts.size() + mTypes.length + 2;
+                }
+                case DIRECTION_RIGHT: {
+                    return mRightAccounts.size() + mTypes.length + 2;
+                }
+                default:
+                    return -1;
             }
         }
 
         @Override
-        public Cursor getItem(int position) {
-            mCursor.moveToPosition(position);
-
-            return mCursor;
+        public Account getItem(int position) {
+            switch (mDirection) {
+                case DIRECTION_LEFT: {
+                    return mLeftAccounts.get(position);
+                }
+                case DIRECTION_RIGHT: {
+                    return mRightAccounts.get(position);
+                }
+                default: {
+                    return null;
+                }
+            }
         }
 
         @Override
@@ -279,10 +292,10 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                     }
                     position--;
 
-                    Cursor c = getItem(getCursorPosition(position));
-                    String title = c.getString(Accounts.COLUMN_INDEX_TITLE);
+                    Account account = getItem(getCursorPosition(position));
+                    String title = account.getTitle();
 
-                    tv.setText(addSign(title, c.getString(Accounts.COLUMN_INDEX_ACCOUNT_TYPE)));
+                    tv.setText(addSign(title, account.getAccountType()));
                     break;
                 }
             }
@@ -403,10 +416,10 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                         sum += mTypeCounts[i];
                     }
                     if (!bound) {
-                        Cursor c = getItem(getCursorPosition(position));
-                        String title = c.getString(Accounts.COLUMN_INDEX_TITLE);
+                        Account account = getItem(getCursorPosition(position));
+                        String title = account.getTitle();
 
-                        if (c.getInt(Accounts.COLUMN_INDEX_IS_GROUP) == 1) {
+                        if (account.isGroup()) {
                             convertView.setPadding(mTypePadding, mTypePadding, mTypePadding, mTypePadding);
                             convertView.setBackgroundResource(R.color.primary_dark);
                         } else {
@@ -416,16 +429,16 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                             } else {
                                 convertView.setBackgroundDrawable(vh.background);
                             }
-                            title = addSign(title, c.getString(Accounts.COLUMN_INDEX_ACCOUNT_TYPE));
+                            title = addSign(title, account.getAccountType());
                         }
 
-                        String memo = c.getString(Accounts.COLUMN_INDEX_MEMO);
+                        String memo = account.getMemo();
 
                         vh.main.setText(title);
                         if (TextUtils.isEmpty(memo)) {
                             vh.sub.setVisibility(View.GONE);
                         } else {
-                            vh.sub.setText(c.getString(Accounts.COLUMN_INDEX_MEMO));
+                            vh.sub.setText(memo);
                             vh.sub.setVisibility(View.VISIBLE);
                         }
                     }
@@ -457,14 +470,15 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                         sum += mTypeCounts[i];
                     }
 
-                    return getItem(getCursorPosition(position)).getInt(Accounts.COLUMN_INDEX_IS_GROUP) != 1;
+                    return !getItem(getCursorPosition(position)).isGroup();
                 }
             }
         }
 
-        public void changeCursor(Cursor cursor) {
-            setCursor(cursor);
-            notifyDataSetChanged();
+        @Override
+        public void notifyDataSetChanged() {
+            refresh();
+            super.notifyDataSetChanged();
         }
 
         public int getSelection(String accountType, String accountId) {
@@ -472,71 +486,84 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                 return 0;
             }
 
-            Cursor c = getItem(0);
+            RealmResults<Account> accounts;
 
-            do {
-                if (c.getString(Accounts.COLUMN_INDEX_ACCOUNT_TYPE).equals(accountType) &&
-                        c.getString(Accounts.COLUMN_INDEX_ACCOUNT_ID).equals(accountId)) {
-                    int selection = c.getPosition() + 2;
+            switch (mDirection) {
+                case DIRECTION_LEFT: {
+                    accounts = mLeftAccounts;
+                    break;
+                }
+                case DIRECTION_RIGHT: {
+                    accounts = mRightAccounts;
+                    break;
+                }
+                default: {
+                    accounts = null;
+                    break;
+                }
+            }
+            if (accounts != null) {
+                int position = 0;
 
-                    for (String type : mTypes) {
-                        if (type.equals(accountType)) {
-                            return selection;
-                        } else {
-                            selection++;
+                for (Account account : accounts) {
+                    if (account.getAccountType().equals(accountType) &&
+                            account.getAccountId().equals(accountId)) {
+                        int selection = position + 2;
+
+                        for (String type : mTypes) {
+                            if (type.equals(accountType)) {
+                                return selection;
+                            } else {
+                                selection++;
+                            }
                         }
                     }
+                    position++;
                 }
-            } while (c.moveToNext());
+            }
 
             return getCount() - 1;
         }
 
-        public Cursor getCursor(int position) {
+        public Account getAccount(int position) {
             return getItem(getCursorPosition(position - 1));
         }
 
-        private void setCursor(Cursor cursor) {
-            this.mCursor = cursor;
-
-            Cursor c;
+        private void refresh() {
+            RealmQuery<Account> query;
+            RealmResults<Account> accounts = null;
 
             switch (mDirection) {
                 case DIRECTION_LEFT: {
-                    c = getActivity().getContentResolver().query(WhooingProvider.getAccountsTypeCountsUri(mSectionId),
-                            null,
-                            Accounts.COLUMN_ACCOUNT_TYPE + " != ?",
-                            new String[] {WhooingKeyValues.INCOME},
-                            null);
+                    query = mLeftQuery;
                     break;
                 }
                 case DIRECTION_RIGHT: {
-                    c = getActivity().getContentResolver().query(WhooingProvider.getAccountsTypeCountsUri(mSectionId),
-                            null,
-                            Accounts.COLUMN_ACCOUNT_TYPE + " != ?",
-                            new String[] {WhooingKeyValues.EXPENSES},
-                            null);
+                    query = mRightQuery;
                     break;
                 }
                 default: {
-                    c = null;
+                    query = null;
                     break;
                 }
             }
+            if (query != null) {
+                accounts = query.findAllSorted("sortOrder", Sort.ASCENDING);
+            }
 
-            if (c != null) {
-                if (c.moveToFirst()) {
-                    int i = 0;
+            if (accounts != null) {
+                RealmResults<Account> accountTypes = accounts.distinct("accountType");
 
-                    mTypes = new String[c.getCount()];
-                    mTypeCounts = new int[c.getCount()];
-                    do {
-                        mTypes[i] = c.getString(0);
-                        mTypeCounts[i] = c.getInt(1);
-                        i++;
-                    } while (c.moveToNext());
+                mTypes = new String[accountTypes.size()];
+                mTypeCounts = new int[accountTypes.size()];
+
+                int i = 0;
+
+                for (Account account : accountTypes) {
+                    mTypes[i] = account.getAccountType();
+                    mTypeCounts[i] = query.findAll().where().equalTo("accountType", account.getAccountType()).findAll().size();
+                    i++;
                 }
-                c.close();
             }
         }
 

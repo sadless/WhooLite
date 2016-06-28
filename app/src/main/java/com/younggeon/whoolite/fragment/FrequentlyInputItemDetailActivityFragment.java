@@ -308,7 +308,7 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
                         null);
             }
             default: {
-                return super.onCreateLoader(id, args);
+                return null;
             }
         }
     }
@@ -316,40 +316,6 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
     @Override
     public void onLoadFinished(Loader loader, Object data) {
         switch (loader.getId()) {
-            case LOADER_ID_LEFT: {
-                AccountsAdapter adapter = (AccountsAdapter) mLeft.getAdapter();
-
-                if (adapter == null) {
-                    switch (mMode) {
-                        case FrequentlyInputItemDetailActivity.MODE_COMPLETE: {
-                            if (mRight.getAdapter() != null && !TextUtils.isEmpty(mMoney.getText())) {
-                                openNotSelectedSpinner();
-                            }
-                            break;
-                        }
-                        default:
-                    }
-                }
-                super.onLoadFinished(loader, data);
-                break;
-            }
-            case LOADER_ID_RIGHT: {
-                AccountsAdapter adapter = (AccountsAdapter) mRight.getAdapter();
-
-                if (adapter == null) {
-                    switch (mMode) {
-                        case FrequentlyInputItemDetailActivity.MODE_COMPLETE: {
-                            if (mLeft.getAdapter() != null && !TextUtils.isEmpty(mMoney.getText())) {
-                                openNotSelectedSpinner();
-                            }
-                            break;
-                        }
-                        default:
-                    }
-                }
-                super.onLoadFinished(loader, data);
-                break;
-            }
             case LOADER_ID_SAVE: {
                 if (mProgress != null) {
                     mProgress.dismiss();
@@ -453,10 +419,44 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
                 }
                 break;
             }
-            default: {
-                super.onLoadFinished(loader, data);
+            default:
+        }
+    }
+
+    @Override
+    protected void leftChanged() {
+        AccountsAdapter adapter = (AccountsAdapter) mLeft.getAdapter();
+
+        if (adapter == null) {
+            switch (mMode) {
+                case FrequentlyInputItemDetailActivity.MODE_COMPLETE: {
+                    if (mRight.getAdapter() != null && !TextUtils.isEmpty(mMoney.getText())) {
+                        openNotSelectedSpinner();
+                    }
+                    break;
+                }
+                default:
             }
         }
+        super.leftChanged();
+    }
+
+    @Override
+    protected void rightChanged() {
+        AccountsAdapter adapter = (AccountsAdapter) mRight.getAdapter();
+
+        if (adapter == null) {
+            switch (mMode) {
+                case FrequentlyInputItemDetailActivity.MODE_COMPLETE: {
+                    if (mLeft.getAdapter() != null && !TextUtils.isEmpty(mMoney.getText())) {
+                        openNotSelectedSpinner();
+                    }
+                    break;
+                }
+                default:
+            }
+        }
+        super.rightChanged();
     }
 
     private void openNotSelectedSpinner() {

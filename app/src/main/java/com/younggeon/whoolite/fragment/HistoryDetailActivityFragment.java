@@ -26,8 +26,8 @@ import com.younggeon.whoolite.activity.HistoryDetailActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.Entries;
 import com.younggeon.whoolite.db.schema.FrequentItems;
-import com.younggeon.whoolite.db.schema.Sections;
 import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Section;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.EntriesLoader;
 import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
@@ -38,6 +38,8 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Locale;
+
+import io.realm.Realm;
 
 /**
  * Created by sadless on 2016. 1. 23..
@@ -134,18 +136,11 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
             });
         }
 
-        Cursor c = getActivity().getContentResolver().query(
-                WhooingProvider.getSectionUri(mSectionId),
-                null,
-                null,
-                null,
-                null);
+        Section section = Realm.getDefaultInstance().where(Section.class).equalTo("sectionId", mSectionId).findFirst();
 
-        if (c != null) {
-            c.moveToFirst();
+        if (section != null) {
             mSectionDateFormat = Utility.getDateFormatFromWhooingDateFormat(
-                    c.getString(Sections.COLUMN_INDEX_DATE_FORMAT));
-            c.close();
+                    section.getDateFormat());
         }
         if (savedInstanceState != null) {
             mEntryDate = savedInstanceState.getInt(INSTANCE_STATE_ENTRY_DATE);
@@ -300,7 +295,7 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                         null);
             }
             default:{
-                return super.onCreateLoader(id, args);
+                return null;
             }
         }
     }
@@ -441,9 +436,7 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                 }
                 break;
             }
-            default: {
-                super.onLoadFinished(loader, data);
-            }
+            default:
         }
     }
 

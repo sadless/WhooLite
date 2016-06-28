@@ -7,14 +7,12 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
-import android.net.Uri;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.content.AsyncTaskLoader;
 import android.support.v4.content.Loader;
-import android.support.v4.database.DatabaseUtilsCompat;
 import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.view.ActionMode;
@@ -39,6 +37,7 @@ import com.younggeon.whoolite.activity.FrequentlyInputItemDetailActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.FrequentItems;
 import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.FrequentItem;
 import com.younggeon.whoolite.util.SoundSearcher;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.EntriesLoader;
@@ -46,6 +45,12 @@ import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
 
 import java.util.ArrayList;
 import java.util.Set;
+
+import io.realm.Realm;
+import io.realm.RealmChangeListener;
+import io.realm.RealmQuery;
+import io.realm.RealmResults;
+import io.realm.Sort;
 
 /**
  * Created by sadless on 2016. 1. 17..
@@ -58,6 +63,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     private static final String INSTANCE_STATE_PROGRESSING_LOADER_IDS = "progressing_loader_id";
     private static final String INSTANCE_STATE_MULTI_INPUT_ARGS = "multi_input_args";
     private static final String INSTANCE_STATE_QUERY_TEXT = "query_text";
+    private static final String INSTANCE_STATE_SEARCHED_TITLES = "searched_titles";
 
     private static final int LOADER_ID_QUERY = 1;
     private static final int LOADER_ID_ENTRY_INPUT_START = 10000;
@@ -68,8 +74,11 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     private ArrayList<Bundle> mMultiInputArgs;
     private Bundle mProgressingItemIdBundle;
     private String mQueryText;
-    private String mShowSlotNumberWhere;
-    private String mSearchResultWhere;
+    private ArrayList<String> mSearchedTitles;
+    private RealmQuery<FrequentItem> mQuery;
+    private RealmResults<FrequentItem> mFrequentItems;
+    private String[] mSortOrderFields;
+    private Sort[] mSortOrderValues;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -84,20 +93,17 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-
         if (savedInstanceState != null) {
             mProgressingItemIdBundle = savedInstanceState.getBundle(INSTANCE_STATE_PROGRESSING_ITEM_ID_BUNDLE);
             mLastLoaderId = savedInstanceState.getInt(INSTANCE_STATE_LAST_LOADER_ID);
             mProgressingLoaderIds = savedInstanceState.getIntegerArrayList(INSTANCE_STATE_PROGRESSING_LOADER_IDS);
             mMultiInputArgs = savedInstanceState.getParcelableArrayList(INSTANCE_STATE_MULTI_INPUT_ARGS);
             mQueryText = savedInstanceState.getString(INSTANCE_STATE_QUERY_TEXT);
+            mSearchedTitles = savedInstanceState.getStringArrayList(INSTANCE_STATE_SEARCHED_TITLES);
         } else {
             mProgressingItemIdBundle = new Bundle();
             mLastLoaderId = LOADER_ID_ENTRY_INPUT_START;
             mProgressingLoaderIds = new ArrayList<>();
-            refreshWhere(prefs, false);
-            refreshSortOrder(prefs, false);
         }
 
         View view = super.onCreateView(inflater, container, savedInstanceState);
@@ -111,7 +117,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
             mEmptyText.setText(R.string.no_search_result);
             mEmptyText.setVisibility(View.VISIBLE);
         }
-        prefs.registerOnSharedPreferenceChangeListener(this);
+        PreferenceManager.getDefaultSharedPreferences(getActivity()).registerOnSharedPreferenceChangeListener(this);
+        setSortOrder();
+        sectionChanged();
 
         return view;
     }
@@ -125,13 +133,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     }
 
     @Override
-    protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager, Cursor cursor) {
-        return new FrequentlyInputAdapter(layoutManager, cursor);
-    }
-
-    @Override
-    protected Uri getMainDataUri() {
-        return WhooingProvider.getFrequentItemsUri(mSectionId);
+    protected WhooLiteAdapter createAdapter(GridLayoutManager layoutManager) {
+        return new FrequentlyInputAdapter(layoutManager);
     }
 
     @Override
@@ -156,6 +159,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         outState.putIntegerArrayList(INSTANCE_STATE_PROGRESSING_LOADER_IDS, mProgressingLoaderIds);
         outState.putParcelableArrayList(INSTANCE_STATE_MULTI_INPUT_ARGS, mMultiInputArgs);
         outState.putString(INSTANCE_STATE_QUERY_TEXT, mQueryText);
+        outState.putStringArrayList(INSTANCE_STATE_SEARCHED_TITLES, mSearchedTitles);
     }
 
     @Override
@@ -243,15 +247,13 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                             getLoaderManager().restartLoader(LOADER_ID_QUERY, null, FrequentlyInputFragment.this));
 
                     loader.sectionId = mSectionId;
-                    loader.sortOrder = mMainDataSortOrder;
                     loader.keyword = newText;
                     loader.forceLoad();
                     mEmptyText.setText(R.string.no_search_result);
                     mRetryButton.setVisibility(View.GONE);
                 } else {
-                    mSearchResultWhere = null;
-                    mMainDataWhere = mShowSlotNumberWhere;
-                    getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, FrequentlyInputFragment.this);
+                    mSearchedTitles = null;
+                    sectionChanged();
                     mEmptyText.setText(mNoDataStringId);
                     mRetryButton.setVisibility(View.VISIBLE);
                 }
@@ -284,21 +286,21 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
             default: {
                 if (id >= LOADER_ID_ENTRY_INPUT_START) {
                     return new EntriesLoader(getActivity(), Request.Method.POST, args);
-                } else {
-                    return super.onCreateLoader(id, args);
                 }
+
+                return null;
             }
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void onLoadFinished(Loader loader, Object data) {
         switch (loader.getId()) {
             case LOADER_ID_QUERY: {
                 if (!TextUtils.isEmpty(mQueryText)) {
-                    mSearchResultWhere = FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_TITLE + " IN " + data;
-                    mMainDataWhere = DatabaseUtilsCompat.concatenateWhere(mSearchResultWhere, mShowSlotNumberWhere);
-                    getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, this);
+                    mSearchedTitles = (ArrayList<String>) data;
+                    sectionChanged();
                 }
                 break;
             }
@@ -388,11 +390,52 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
     @Override
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences, String key) {
-        if (key.equals(getString(R.string.pref_key_show_slot_numbers))) {
-            refreshWhere(sharedPreferences, true);
-        } else if (key.equals(getString(R.string.pref_key_frequently_input_sort_order))) {
-            refreshSortOrder(sharedPreferences, true);
+        if (key.equals(getString(R.string.pref_key_frequently_input_sort_order))) {
+            setSortOrder();
         }
+        sectionChanged();
+    }
+
+    @Override
+    protected int getDataCount() {
+        return mFrequentItems.size();
+    }
+
+    @Override
+    protected void sectionChanged() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        Set<String> showSlotNumberSet = SharedPreferenceCompat.getStringSet(prefs,
+                getString(R.string.pref_key_show_slot_numbers), null);
+
+        mQuery = mRealm.where(FrequentItem.class).equalTo("sectionId", mSectionId);
+        if (showSlotNumberSet != null && showSlotNumberSet.size() < 3) {
+            for (String slotNumber : showSlotNumberSet) {
+                mQuery = mQuery.equalTo("slotNumber", Integer.parseInt(slotNumber));
+            }
+        }
+        if (mSearchedTitles != null) {
+            boolean first = true;
+
+            for (String title : mSearchedTitles) {
+                if (!first) {
+                    mQuery = mQuery.or();
+                } else {
+                    first = false;
+                }
+                mQuery = mQuery.equalTo("title", title);
+            }
+        }
+        if (mFrequentItems != null) {
+            mFrequentItems.removeChangeListeners();
+        }
+        mFrequentItems = mQuery.findAllSorted(mSortOrderFields, mSortOrderValues);
+        mFrequentItems.addChangeListener(new RealmChangeListener<RealmResults<FrequentItem>>() {
+            @Override
+            public void onChange(RealmResults<FrequentItem> element) {
+                mainDataChanged();
+            }
+        });
+        mainDataChanged();
     }
 
     private void inputEntry(int slotNumber, String itemId, String itemTitle, String money,
@@ -497,48 +540,39 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         }
     }
 
-    private void refreshWhere(SharedPreferences prefs, boolean needRestartMainData) {
-        if (prefs == null) {
-            prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-        }
-        Set<String> showSlotNumberSet = SharedPreferenceCompat.getStringSet(prefs,
-                getString(R.string.pref_key_show_slot_numbers),
-                null);
-
-        if (showSlotNumberSet != null) {
-            boolean isFirst = true;
-
-            mShowSlotNumberWhere = FrequentItems.COLUMN_SLOT_NUMBER + " IN " + "(";
-            for (String slotNumber : showSlotNumberSet) {
-                if (isFirst) {
-                    mShowSlotNumberWhere += slotNumber;
-                    isFirst = false;
-                } else {
-                    mShowSlotNumberWhere += "," + slotNumber;
-                }
-            }
-            mShowSlotNumberWhere += ")";
-            mMainDataWhere = DatabaseUtilsCompat.concatenateWhere(mSearchResultWhere, mShowSlotNumberWhere);
-        }
-        if (needRestartMainData) {
-            getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, FrequentlyInputFragment.this);
-        }
-    }
-
-    private void refreshSortOrder(SharedPreferences prefs, boolean needRestartMainData) {
-        if (prefs == null) {
-            prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-        }
-        String sortOrderFormat = prefs.getString(getString(R.string.pref_key_frequently_input_sort_order),
+    private void setSortOrder() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        String sortOrderPref = prefs.getString(getString(R.string.pref_key_frequently_input_sort_order),
                 getString(R.string.pref_frequently_input_sort_order_default));
+        String[] prefComponents = sortOrderPref.split(" ");
 
-        mMainDataSortOrder = String.format(FrequentItems.TABLE_NAME + "." + sortOrderFormat,
-                FrequentItems.COLUMN_USE_COUNT,
-                FrequentItems.COLUMN_LAST_USE_TIME,
-                FrequentItems.COLUMN_SORT_ORDER);
-        mMainDataSortOrder = FrequentItems.COLUMN_SLOT_NUMBER + " ASC, " + mMainDataSortOrder;
-        if (needRestartMainData) {
-            getLoaderManager().restartLoader(LOADER_ID_MAIN_DATA, null, FrequentlyInputFragment.this);
+        mSortOrderFields = new String[2];
+        mSortOrderValues = new Sort[2];
+        mSortOrderFields[0] = "slotNumber";
+        mSortOrderValues[0] = Sort.ASCENDING;
+        switch (prefComponents[0].charAt(1)) {
+            case '1': {
+                mSortOrderFields[1] = "useCount";
+                break;
+            }
+            case '2': {
+                mSortOrderFields[1] = "lastUseTime";
+                break;
+            }
+            case '3': {
+                mSortOrderFields[1] = "sortOrder";
+                break;
+            }
+        }
+        switch (prefComponents[1].charAt(0)) {
+            case 'A': {
+                mSortOrderValues[1] = Sort.ASCENDING;
+                break;
+            }
+            case 'D': {
+                mSortOrderValues[1] = Sort.DESCENDING;
+                break;
+            }
         }
     }
 
@@ -556,14 +590,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     }
 
     private class FrequentlyInputAdapter extends WhooLiteAdapter {
-        public FrequentlyInputAdapter(GridLayoutManager gridLayoutManager, Cursor cursor) {
-            super(gridLayoutManager, cursor);
+        public FrequentlyInputAdapter(GridLayoutManager gridLayoutManager) {
+            super(gridLayoutManager);
 
-            mColumnIndexTitle = FrequentItems.COLUMN_INDEX_TITLE;
-            mColumnIndexMoney = FrequentItems.COLUMN_INDEX_MONEY;
-            mColumnIndexLeftAccountType = FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE;
-            mColumnIndexRightAccountType = FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE;
-            mColumnIndexItemId = FrequentItems.COLUMN_INDEX_ITEM_ID;
             mItemLayoutId = R.layout.recycler_item_frequent_item;
         }
 
@@ -573,15 +602,16 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         }
 
         @Override
-        protected void itemClicked(View view, Cursor cursor) {
+        protected void itemClicked(View view, int dataPosition) {
             Intent intent = new Intent(getActivity(),
                     FrequentlyInputItemDetailActivity.class);
+            FrequentItem item = mFrequentItems.get(dataPosition);
 
             intent.putExtra(FrequentlyInputItemDetailActivity.EXTRA_SECTION_ID, mSectionId)
                     .putExtra(FrequentlyInputItemDetailActivity.EXTRA_ITEM_ID,
-                            cursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID))
+                            item.getItemId())
                     .putExtra(FrequentlyInputItemDetailActivity.EXTRA_SLOT_NUMBER,
-                            cursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER))
+                            item.getSlotNumber())
                     .putExtra(FrequentlyInputItemDetailActivity.EXTRA_MODE,
                             FrequentlyInputItemDetailActivity.MODE_EDIT);
             ActivityCompat.startActivity(getActivity(),
@@ -595,21 +625,62 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         }
 
         @Override
-        protected Uri getSectionDataUri() {
-            return WhooingProvider.getFrequentItemSlotCountsUri(mSectionId);
+        protected String getSelectionId(int dataPosition) {
+            FrequentItem item = mFrequentItems.get(dataPosition);
+
+            return item.getSlotNumber() + ":" + item.getItemId();
         }
 
         @Override
-        protected String getSectionText(int sectionData) {
-            return getString(R.string.slot_name, sectionData);
+        protected String getTitle(int dataPosition) {
+            return mFrequentItems.get(dataPosition).getTitle();
         }
 
         @Override
-        protected String getSelectionId(int cursorPosition) {
-            mCursor.moveToPosition(cursorPosition);
+        protected double getMoney(int dataPosition) {
+            return mFrequentItems.get(dataPosition).getMoney();
+        }
 
-            return mCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER) + ":" +
-                    mCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID);
+        @Override
+        protected String getLeftAccountType(int dataPosition) {
+            return mFrequentItems.get(dataPosition).getLeftAccountType();
+        }
+
+        @Override
+        protected String getLeftAccountId(int dataPosition) {
+            return mFrequentItems.get(dataPosition).getLeftAccountId();
+        }
+
+        @Override
+        protected String getRightAccountType(int dataPosition) {
+            return mFrequentItems.get(dataPosition).getRightAccountType();
+        }
+
+        @Override
+        protected String getRightAccountId(int dataPosition) {
+            return mFrequentItems.get(dataPosition).getRightAccountId();
+        }
+
+        @Override
+        protected long getValueForItemId(int dataPosition) {
+            return mFrequentItems.get(dataPosition).getItemId().hashCode();
+        }
+
+        @Override
+        protected void refreshSections() {
+            RealmResults<FrequentItem> items = mQuery.findAllSorted("sortOrder", Sort.ASCENDING);
+            RealmResults<FrequentItem> itemSlots = items.distinct("slotNumber");
+
+            mSectionTitles = new String[itemSlots.size()];
+            mSectionDataCounts = new int[itemSlots.size()];
+
+            int i = 0;
+
+            for (FrequentItem item : items) {
+                mSectionTitles[i] = getString(R.string.slot_name, item.getSlotNumber());
+                mSectionDataCounts[i] = mQuery.findAll().where().equalTo("slotNumber", item.getSlotNumber()).findAll().size();
+                i++;
+            }
         }
 
         @Override
@@ -624,14 +695,13 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                         public void onClick(View v) {
                             FrequentlyInputItemViewHolder vh = (FrequentlyInputItemViewHolder) v.getTag();
                             int position = vh.getAdapterPosition();
+                            FrequentItem item = mFrequentItems.get(getDataPosition(position));
 
-                            mCursor.moveToPosition(getCursorPosition(position));
-
-                            double money = mCursor.getDouble(FrequentItems.COLUMN_INDEX_MONEY);
-                            String leftAccountType = mCursor.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE);
-                            String rightAccountType = mCursor.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE);
-                            int slotNumber = mCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER);
-                            String itemId = mCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID);
+                            double money = item.getMoney();
+                            String leftAccountType = item.getLeftAccountType();
+                            String rightAccountType = item.getRightAccountType();
+                            int slotNumber = item.getSlotNumber();
+                            String itemId = item.getItemId();
 
                             if (money < WhooingKeyValues.EPSILON ||
                                     TextUtils.isEmpty(leftAccountType) ||
@@ -651,12 +721,12 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                             } else {
                                 inputEntry(slotNumber,
                                         itemId,
-                                        mCursor.getString(FrequentItems.COLUMN_INDEX_TITLE),
+                                        item.getTitle(),
                                         "" + money,
                                         leftAccountType,
-                                        mCursor.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID),
+                                        item.getLeftAccountId(),
                                         rightAccountType,
-                                        mCursor.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID),
+                                        item.getRightAccountId(),
                                         null);
                             }
                         }
@@ -666,19 +736,16 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                         public boolean onLongClick(View v) {
                             FrequentlyInputItemViewHolder vh = (FrequentlyInputItemViewHolder) v.getTag();
                             int position = vh.getAdapterPosition();
-
-                            mCursor.moveToPosition(getCursorPosition(position));
-
+                            FrequentItem item = mFrequentItems.get(getDataPosition(position));
                             Intent intent = new Intent(getActivity(),
                                     FrequentlyInputItemDetailActivity.class);
-
 
                             intent.putExtra(FrequentlyInputItemDetailActivity.EXTRA_SECTION_ID,
                                     mSectionId)
                                     .putExtra(FrequentlyInputItemDetailActivity.EXTRA_SLOT_NUMBER,
-                                            mCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER))
+                                            item.getSlotNumber())
                                     .putExtra(FrequentlyInputItemDetailActivity.EXTRA_ITEM_ID,
-                                            mCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID))
+                                            item.getItemId())
                                     .putExtra(FrequentlyInputItemDetailActivity.EXTRA_MODE,
                                             FrequentlyInputItemDetailActivity.MODE_COMPLETE);
                             startActivityForResult(intent, REQUEST_CODE_COMPLETE_FREQUENT_ITEM);
@@ -687,9 +754,10 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                         }
                     });
                     if (mActionMode == null) {
+                        FrequentItem item = mFrequentItems.get(getDataPosition(position));
+
                         if (mCurrentProgressingItemIds.contains(
-                                mCursor.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER) + ":" +
-                                        mCursor.getString(FrequentItems.COLUMN_INDEX_ITEM_ID))) {
+                                item.getSlotNumber() + ":" + item.getItemId())) {
                             viewHolder.send.setVisibility(View.GONE);
                             viewHolder.progress.setVisibility(View.VISIBLE);
                         } else {
@@ -709,9 +777,8 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         }
     }
 
-    private static class QueryLoader extends AsyncTaskLoader<String> {
+    private static class QueryLoader extends AsyncTaskLoader<ArrayList<String>> {
         public String sectionId;
-        public String sortOrder;
         public String keyword;
 
         public QueryLoader(Context context) {
@@ -719,34 +786,31 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         }
 
         @Override
-        public String loadInBackground() {
-            Cursor c = getContext().getContentResolver().query(WhooingProvider.getFrequentItemsUri(sectionId),
-                    null,
-                    null,
-                    null,
-                    sortOrder);
-            String retVal = "(";
-            boolean isFirst = true;
+        public ArrayList<String> loadInBackground() {
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+            Set<String> showSlotNumberSet = SharedPreferenceCompat.getStringSet(prefs,
+                    getContext().getString(R.string.pref_key_show_slot_numbers), null);
+            Realm realm = Realm.getDefaultInstance();
+            RealmQuery<FrequentItem> query = realm.where(FrequentItem.class).equalTo("sectionId", sectionId);
 
-            if (c != null) {
-                if (c.moveToFirst()) {
-                    do {
-                        String originalTitle = c.getString(FrequentItems.COLUMN_INDEX_TITLE);
-                        String trimmedTitle = originalTitle.replaceAll("\\s", "");
-
-                        if (SoundSearcher.matchString(trimmedTitle, keyword)) {
-                            if (isFirst) {
-                                retVal += "'" + originalTitle + "'";
-                                isFirst = false;
-                            } else {
-                                retVal += ",'" + originalTitle + "'";
-                            }
-                        }
-                    } while (c.moveToNext());
+            if (showSlotNumberSet != null && showSlotNumberSet.size() < 3) {
+                for (String slotNumber : showSlotNumberSet) {
+                    query = query.equalTo("slotNumber", Integer.parseInt(slotNumber));
                 }
-                c.close();
             }
-            retVal += ")";
+
+            RealmResults<FrequentItem> items = query.findAll();
+            ArrayList<String> retVal = new ArrayList<>();
+
+            for (FrequentItem item : items) {
+                String originalTitle = item.getTitle();
+                String trimmedTitle = originalTitle.replaceAll("\\s", "");
+
+                if (SoundSearcher.matchString(trimmedTitle, keyword)) {
+                    retVal.add(originalTitle);
+                }
+            }
+            realm.close();
 
             return retVal;
         }
