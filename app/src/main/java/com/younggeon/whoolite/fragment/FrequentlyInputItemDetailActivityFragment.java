@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.content.Loader;
 import android.support.v7.app.AlertDialog;
@@ -14,6 +15,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
@@ -456,10 +458,27 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
     }
 
     private void openNotSelectedSpinner() {
+        Spinner spinner = null;
+
         if (TextUtils.isEmpty(mLeftAccountType)) {
-            mLeft.performClick();
+            spinner = mLeft;
         } else if (TextUtils.isEmpty(mRightAccountType)) {
-            mRight.performClick();
+            spinner = mRight;
+        }
+        if (spinner != null) {
+            final Spinner finalSpinner = spinner;
+
+            spinner.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+                @Override
+                public void onGlobalLayout() {
+                    if (Build.VERSION.SDK_INT >= 16) {
+                        finalSpinner.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    } else {
+                        finalSpinner.getViewTreeObserver().removeGlobalOnLayoutListener(this);
+                    }
+                    finalSpinner.performClick();
+                }
+            });
         }
     }
 }

@@ -108,24 +108,24 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         mRealm = Realm.getDefaultInstance();
         mLeftQuery = mRealm.where(Account.class).equalTo("sectionId", mSectionId)
                 .notEqualTo("accountType", WhooingKeyValues.INCOME);
-        mLeftAccounts = mLeftQuery.findAllSortedAsync("sortOrder", Sort.ASCENDING);
+        mLeftAccounts = mLeftQuery.findAllSorted("sortOrder", Sort.ASCENDING);
         mLeftAccounts.addChangeListener(new RealmChangeListener<RealmResults<Account>>() {
             @Override
             public void onChange(RealmResults<Account> element) {
                 leftChanged();
             }
         });
-//        leftChanged();
+        leftChanged();
         mRightQuery = mRealm.where(Account.class).equalTo("sectionId", mSectionId)
                 .notEqualTo("accountType", WhooingKeyValues.EXPENSES);
-        mRightAccounts = mRightQuery.findAllSortedAsync("sortOrder", Sort.ASCENDING);
+        mRightAccounts = mRightQuery.findAllSorted("sortOrder", Sort.ASCENDING);
         mRightAccounts.addChangeListener(new RealmChangeListener<RealmResults<Account>>() {
             @Override
             public void onChange(RealmResults<Account> element) {
                 rightChanged();
             }
         });
-//        rightChanged();
+        rightChanged();
         getLoaderManager().initLoader(LOADER_ID_DELETE, null, this);
         setHasOptionsMenu(true);
 

@@ -127,14 +127,13 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
             });
         }
         mRealm = Realm.getDefaultInstance();
-        mSections = mRealm.where(Section.class).findAllSorted("sortOrder", Sort.ASCENDING);
+        mSections = mRealm.where(Section.class).findAllSortedAsync("sortOrder", Sort.ASCENDING);
         mSections.addChangeListener(new RealmChangeListener<RealmResults<Section>>() {
             @Override
             public void onChange(RealmResults<Section> element) {
                 sectionChanged();
             }
         });
-        sectionChanged();
 
         TabLayout tabLayout = (TabLayout) findViewById(R.id.tab);
         ViewPager pager = (ViewPager) findViewById(R.id.pager);
