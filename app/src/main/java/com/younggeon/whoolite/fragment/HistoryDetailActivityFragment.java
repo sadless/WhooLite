@@ -4,7 +4,6 @@ import android.app.DatePickerDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.database.Cursor;
 import android.os.Bundle;
 import android.support.v4.content.Loader;
 import android.support.v7.app.AlertDialog;
@@ -24,9 +23,8 @@ import com.android.volley.Request;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.activity.HistoryDetailActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
-import com.younggeon.whoolite.db.schema.Entries;
 import com.younggeon.whoolite.db.schema.FrequentItems;
-import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Entry;
 import com.younggeon.whoolite.realm.Section;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.EntriesLoader;
@@ -63,26 +61,24 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
     @Override
     protected void initialize() {
         if (mEntryId >= 0) {
-            Cursor c = getActivity().getContentResolver().query(WhooingProvider.getEntryItemUri(mSectionId, mEntryId),
-                    null,
-                    null,
-                    null,
-                    null);
-            if (c != null) {
-                c.moveToFirst();
-                mEntryDate = (int) c.getDouble(Entries.COLUMN_INDEX_ENTRY_DATE);
-                double money = c.getDouble(Entries.COLUMN_INDEX_MONEY);
-                mTitle.setText(c.getString(Entries.COLUMN_INDEX_TITLE));
+            Realm realm = Realm.getDefaultInstance();
+            Entry entry = realm.where(Entry.class).equalTo("sectionId", mSectionId)
+                    .equalTo("entryId", mEntryId).findFirst();
+
+            if (entry != null) {
+                mEntryDate = entry.getEntryDate();
+                double money = entry.getMoney();
+                mTitle.setText(entry.getTitle());
                 if (money >= WhooingKeyValues.EPSILON) {
                     mMoney.setText(new DecimalFormat().format(money).replace(",", ""));
                 }
-                mMemo.setText(c.getString(Entries.COLUMN_INDEX_MEMO));
-                mLeftAccountType = c.getString(Entries.COLUMN_INDEX_LEFT_ACCOUNT_TYPE);
-                mLeftAccountId = c.getString(Entries.COLUMN_INDEX_LEFT_ACCOUNT_ID);
-                mRightAccountType = c.getString(Entries.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE);
-                mRightAccountId = c.getString(Entries.COLUMN_INDEX_RIGHT_ACCOUNT_ID);
-                c.close();
+                mMemo.setText(entry.getMemo());
+                mLeftAccountType = entry.getLeftAccountType();
+                mLeftAccountId = entry.getLeftAccountId();
+                mRightAccountType = entry.getRightAccountType();
+                mRightAccountId = entry.getRightAccountId();
             }
+            realm.close();
         } else {
             getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
             mEntryDate = Integer.parseInt(mEntryDateFormat.format(new Date()));

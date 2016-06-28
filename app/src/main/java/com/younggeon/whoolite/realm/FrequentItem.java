@@ -21,7 +21,7 @@ public class FrequentItem extends RealmObject {
     private String rightAccountType;
     private String rightAccountId;
     private int useCount = 0;
-    private int lastUseTime = 0;
+    private long lastUseTime = 0;
     private int sortOrder;
 
     public String getPrimaryKey() {
@@ -112,11 +112,11 @@ public class FrequentItem extends RealmObject {
         this.useCount = useCount;
     }
 
-    public int getLastUseTime() {
+    public long getLastUseTime() {
         return lastUseTime;
     }
 
-    public void setLastUseTime(int lastUseTime) {
+    public void setLastUseTime(long lastUseTime) {
         this.lastUseTime = lastUseTime;
     }
 

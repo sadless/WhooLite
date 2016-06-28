@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.database.Cursor;
 import android.os.Bundle;
 import android.support.v4.content.Loader;
 import android.support.v7.app.AlertDialog;
@@ -25,12 +24,14 @@ import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.activity.FrequentlyInputItemDetailActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.db.schema.FrequentItems;
-import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.FrequentItem;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.EntriesLoader;
 import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
 
 import java.text.DecimalFormat;
+
+import io.realm.Realm;
 
 /**
  * Created by sadless on 2016. 1. 18..
@@ -45,25 +46,20 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
 
     @Override
     protected void initialize() {
-        Cursor c = getActivity().getContentResolver().query(WhooingProvider.getFrequentItemUri(
-                        mSectionId,
-                        mOldSlotNumber,
-                        mItemId),
-                null,
-                null,
-                null,
-                null);
+        Realm realm = Realm.getDefaultInstance();
+        FrequentItem frequentItem = realm.where(FrequentItem.class)
+                .equalTo("sectionId", mSectionId)
+                .equalTo("slotNumber", mOldSlotNumber)
+                .equalTo("itemId", mItemId).findFirst();
 
-        if (c != null) {
-            c.moveToFirst();
+        if (frequentItem != null) {
+            double money = frequentItem.getMoney();
 
-            double money = c.getDouble(FrequentItems.COLUMN_INDEX_MONEY);
-
-            mTitle.setText(c.getString(FrequentItems.COLUMN_INDEX_TITLE));
-            mLeftAccountType = c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE);
-            mLeftAccountId = c.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID);
-            mRightAccountType = c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE);
-            mRightAccountId = c.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID);
+            mTitle.setText(frequentItem.getTitle());
+            mLeftAccountType = frequentItem.getLeftAccountType();
+            mLeftAccountId = frequentItem.getLeftAccountId();
+            mRightAccountType = frequentItem.getRightAccountType();
+            mRightAccountId = frequentItem.getRightAccountId();
             if (money >= WhooingKeyValues.EPSILON) {
                 mMoney.setText(new DecimalFormat().format(money).replace(",", ""));
             } else {
@@ -78,8 +74,8 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
                     default:
                 }
             }
-            c.close();
         }
+        realm.close();
     }
 
     @Override

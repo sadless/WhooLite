@@ -3,7 +3,6 @@ package com.younggeon.whoolite.activity;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.design.widget.TabLayout;
@@ -37,7 +36,6 @@ import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.fragment.FrequentlyInputFragment;
 import com.younggeon.whoolite.fragment.HistoryFragment;
-import com.younggeon.whoolite.provider.WhooingProvider;
 import com.younggeon.whoolite.realm.Section;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.AccountsLoader;
@@ -226,30 +224,25 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
                 int resultCode = (Integer) data;
 
                 if (resultCode < 0) {
-                    Cursor c = getContentResolver().query(WhooingProvider.getSectionsUri(),
-                            null,
-                            null,
-                            null,
-                            null);
+                    Realm realm = Realm.getDefaultInstance();
+                    RealmResults<Section> sections = realm.where(Section.class).findAll();
 
-                    if (c != null) {
-                        if (c.getCount() == 0) {
-                            new AlertDialog.Builder(WhooLiteActivity.this)
-                                    .setTitle(R.string.no_sections)
-                                    .setMessage(R.string.no_sections_message)
-                                    .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
-                                        @Override
-                                        public void onClick(DialogInterface dialog, int which) {
-                                            getSupportLoaderManager()
-                                                    .initLoader(LOADER_ID_REFRESH_SECTIONS,
-                                                            null,
-                                                            WhooLiteActivity.this).forceLoad();
-                                        }
-                                    }).setCancelable(false)
-                                    .create().show();
-                        }
-                        c.close();
+                    if (sections.size() == 0) {
+                        new AlertDialog.Builder(WhooLiteActivity.this)
+                                .setTitle(R.string.no_sections)
+                                .setMessage(R.string.no_sections_message)
+                                .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        getSupportLoaderManager()
+                                                .initLoader(LOADER_ID_REFRESH_SECTIONS,
+                                                        null,
+                                                        WhooLiteActivity.this).forceLoad();
+                                    }
+                                }).setCancelable(false)
+                                .create().show();
                     }
+                    realm.close();
                 } else {
                     Utility.checkResultCodeWithAlert(this, resultCode);
                 }

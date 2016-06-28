@@ -1,8 +1,6 @@
 package com.younggeon.whoolite.whooing.loader;
 
-import android.content.ContentValues;
 import android.content.Context;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.content.Loader;
@@ -10,10 +8,8 @@ import android.support.v4.content.Loader;
 import com.android.volley.Request;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
-import com.younggeon.whoolite.db.schema.Entries;
-import com.younggeon.whoolite.db.schema.FrequentItems;
-import com.younggeon.whoolite.provider.WhooingProvider;
 import com.younggeon.whoolite.realm.Entry;
+import com.younggeon.whoolite.realm.FrequentItem;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -62,49 +58,28 @@ public class EntriesLoader extends WhooingBaseLoader {
                         args));
                 try {
                     JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
+                    Realm realm = Realm.getDefaultInstance();
 
+                    realm.beginTransaction();
                     if (slotNumber > 0) {
-                        Uri frequentItemUri = WhooingProvider.getFrequentItemUri(sectionId,
-                                slotNumber,
-                                frequentItemId);
-                        Cursor c = getContext().getContentResolver()
-                                .query(frequentItemUri,
-                                        new String[]{FrequentItems.COLUMN_USE_COUNT, FrequentItems.COLUMN_LAST_USE_TIME},
-                                        null,
-                                        null,
-                                        null);
+                        FrequentItem frequentItem = realm.where(FrequentItem.class)
+                                .equalTo("sectionId", sectionId)
+                                .equalTo("slotNumber", slotNumber)
+                                .equalTo("itemId", frequentItemId).findFirst();
 
-                        if (c != null) {
-                            ContentValues cv = new ContentValues();
-
-                            c.moveToFirst();
-                            cv.put(FrequentItems.COLUMN_USE_COUNT, c.getInt(0) + 1);
-                            cv.put(FrequentItems.COLUMN_LAST_USE_TIME, (new Date()).getTime());
-                            getContext().getContentResolver().update(frequentItemUri,
-                                    cv,
-                                    null,
-                                    null);
-                            c.close();
+                        if (frequentItem != null) {
+                            frequentItem.setUseCount(frequentItem.getUseCount() + 1);
+                            frequentItem.setLastUseTime((new Date()).getTime());
                         }
                     }
                     resultCode = result.optInt(WhooingKeyValues.CODE);
                     if (resultCode == WhooingKeyValues.SUCCESS) {
                         JSONObject resultItem = result.optJSONArray(WhooingKeyValues.RESULT).optJSONObject(0);
-                        ContentValues cv = new ContentValues();
 
-                        cv.put(Entries.COLUMN_ENTRY_ID, resultItem.optLong(WhooingKeyValues.ENTRY_ID));
-                        cv.put(Entries.COLUMN_ENTRY_DATE, resultItem.optDouble(WhooingKeyValues.ENTRY_DATE));
-                        cv.put(Entries.COLUMN_LEFT_ACCOUNT_TYPE, resultItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
-                        cv.put(Entries.COLUMN_LEFT_ACCOUNT_ID, resultItem.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
-                        cv.put(Entries.COLUMN_RIGHT_ACCOUNT_TYPE, resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
-                        cv.put(Entries.COLUMN_RIGHT_ACCOUNT_ID, resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
-                        cv.put(Entries.COLUMN_TITLE, resultItem.optString(WhooingKeyValues.ITEM_TITLE));
-                        cv.put(Entries.COLUMN_MONEY, resultItem.optDouble(WhooingKeyValues.MONEY));
-                        cv.put(Entries.COLUMN_MEMO, resultItem.optString(WhooingKeyValues.MEMO));
-                        getContext().getContentResolver()
-                                .insert(WhooingProvider.getEntriesUri(sectionId),
-                                        cv);
+                        realm.copyToRealm(createEntryObjectFromJson(resultItem, sectionId));
                     }
+                    realm.commitTransaction();
+                    realm.close();
                 } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
                     e.printStackTrace();
 
@@ -134,9 +109,14 @@ public class EntriesLoader extends WhooingBaseLoader {
                         int resultCode = result.optInt(WhooingKeyValues.RESULT);
 
                         if (resultCode == WhooingKeyValues.SUCCESS) {
-                            getContext().getContentResolver().delete(WhooingProvider.getEntryItemUri(sectionId, entryId),
-                                    null,
-                                    null);
+                            Realm realm = Realm.getDefaultInstance();
+
+                            realm.beginTransaction();
+                            realm.where(Entry.class)
+                                    .equalTo("sectionId", sectionId)
+                                    .equalTo("entryId", entryId).findFirst().deleteFromRealm();
+                            realm.commitTransaction();
+                            realm.close();
                         }
 
                         return resultCode;
@@ -146,12 +126,17 @@ public class EntriesLoader extends WhooingBaseLoader {
                         return -1;
                     }
                 } else {
+                    Realm realm = Realm.getDefaultInstance();
+                    RealmQuery<Entry> query = realm.where(Entry.class).equalTo("sectionId", sectionId);
                     String itemIdsPath = "" + selectedItems.get(0);
                     Uri.Builder builder = Uri.parse(URI_ENTRIES).buildUpon();
 
+                    query.beginGroup().equalTo("entryId", selectedItems.get(0));
                     for (int i = 1; i < selectedItems.size(); i++) {
                         itemIdsPath += "," + selectedItems.get(i);
+                        query.or().equalTo("entryId", selectedItems.get(0));
                     }
+                    query.endGroup();
                     builder.appendEncodedPath(itemIdsPath + ".json");
                     WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
                             builder.build().toString(),
@@ -163,11 +148,12 @@ public class EntriesLoader extends WhooingBaseLoader {
                         int resultCode = result.optInt(WhooingKeyValues.CODE);
 
                         if (resultCode == WhooingKeyValues.SUCCESS) {
-                            String itemIdArray = "(" + itemIdsPath + ")";
+                            RealmResults<Entry> deletedEntries = query.findAll();
 
-                            getContext().getContentResolver().delete(WhooingProvider.getEntriesUri(sectionId),
-                                    Entries.COLUMN_ENTRY_ID + " IN " + itemIdArray,
-                                    null);
+                            realm.beginTransaction();
+                            deletedEntries.deleteAllFromRealm();
+                            realm.commitTransaction();
+                            realm.close();
                         }
 
                         return resultCode;
@@ -198,19 +184,14 @@ public class EntriesLoader extends WhooingBaseLoader {
                     resultCode = result.optInt(WhooingKeyValues.CODE);
                     if (resultCode == WhooingKeyValues.SUCCESS) {
                         JSONObject resultItem = result.optJSONObject(WhooingKeyValues.RESULT);
-                        ContentValues cv = new ContentValues();
+                        Realm realm = Realm.getDefaultInstance();
+                        Entry entry = realm.where(Entry.class).equalTo("sectionId", sectionId)
+                                .equalTo("entryId", entryId).findFirst();
 
-                        cv.put(Entries.COLUMN_ENTRY_DATE, resultItem.optDouble(WhooingKeyValues.ENTRY_DATE));
-                        cv.put(Entries.COLUMN_LEFT_ACCOUNT_TYPE, resultItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
-                        cv.put(Entries.COLUMN_LEFT_ACCOUNT_ID, resultItem.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
-                        cv.put(Entries.COLUMN_RIGHT_ACCOUNT_TYPE, resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
-                        cv.put(Entries.COLUMN_RIGHT_ACCOUNT_ID, resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
-                        cv.put(Entries.COLUMN_TITLE, resultItem.optString(WhooingKeyValues.ITEM_TITLE));
-                        cv.put(Entries.COLUMN_MONEY, resultItem.optDouble(WhooingKeyValues.MONEY));
-                        cv.put(Entries.COLUMN_MEMO, resultItem.optString(WhooingKeyValues.MEMO));
-                        getContext().getContentResolver().update(WhooingProvider
-                                        .getEntryItemUri(args.getString(WhooingKeyValues.SECTION_ID), entryId),
-                                cv, null, null);
+                        realm.beginTransaction();
+                        setEntryFromJson(entry, resultItem);
+                        realm.commitTransaction();
+                        realm.close();
                     }
                 } catch (JSONException | InterruptedException | ExecutionException | TimeoutException e) {
                     e.printStackTrace();
@@ -244,22 +225,8 @@ public class EntriesLoader extends WhooingBaseLoader {
 
                         for (int i = 0; i < entries.length(); i++) {
                             JSONObject entry = entries.optJSONObject(i);
-                            Entry object = new Entry();
-                            double entryDate = entry.optDouble(WhooingKeyValues.ENTRY_DATE);
+                            Entry object = createEntryObjectFromJson(entry, sectionId);
 
-                            object.setSectionId(sectionId);
-                            object.setEntryId(entry.optLong(WhooingKeyValues.ENTRY_ID));
-                            object.setTitle(entry.optString(WhooingKeyValues.ITEM_TITLE));
-                            object.setMoney(entry.optDouble(WhooingKeyValues.MONEY));
-                            object.setLeftAccountType(entry.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
-                            object.setLeftAccountId(entry.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
-                            object.setRightAccountType(entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
-                            object.setRightAccountId(entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
-                            object.setMemo(entry.optString(WhooingKeyValues.MEMO));
-                            object.setEntryDate((int)entryDate);
-                            entryDate -= (int) entryDate;
-                            object.setSortOrder((int)(entryDate * 10000));
-                            object.composePrimaryKey();
                             query.notEqualTo("primaryKey", object.getPrimaryKey());
                             objects.add(object);
                         }
@@ -290,5 +257,31 @@ public class EntriesLoader extends WhooingBaseLoader {
 
     public static EntriesLoader castLoader(Loader loader) {
         return (EntriesLoader) loader;
+    }
+
+    private Entry createEntryObjectFromJson(JSONObject entry, String sectionId) {
+        Entry object = new Entry();
+
+        object.setSectionId(sectionId);
+        object.setEntryId(entry.optLong(WhooingKeyValues.ENTRY_ID));
+        setEntryFromJson(object, entry);
+        object.composePrimaryKey();
+
+        return object;
+    }
+
+    private void setEntryFromJson(Entry object, JSONObject entry) {
+        double entryDate = entry.optDouble(WhooingKeyValues.ENTRY_DATE);
+
+        object.setTitle(entry.optString(WhooingKeyValues.ITEM_TITLE));
+        object.setMoney(entry.optDouble(WhooingKeyValues.MONEY));
+        object.setLeftAccountType(entry.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
+        object.setLeftAccountId(entry.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
+        object.setRightAccountType(entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
+        object.setRightAccountId(entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
+        object.setMemo(entry.optString(WhooingKeyValues.MEMO));
+        object.setEntryDate((int)entryDate);
+        entryDate -= (int) entryDate;
+        object.setSortOrder((int)(entryDate * 10000));
     }
 }

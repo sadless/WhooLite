@@ -1,8 +1,6 @@
 package com.younggeon.whoolite.whooing.loader;
 
-import android.content.ContentValues;
 import android.content.Context;
-import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.content.Loader;
@@ -12,9 +10,8 @@ import com.android.volley.Request;
 import com.android.volley.toolbox.RequestFuture;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
-import com.younggeon.whoolite.db.schema.Entries;
 import com.younggeon.whoolite.db.schema.FrequentItems;
-import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Entry;
 import com.younggeon.whoolite.realm.FrequentItem;
 
 import org.json.JSONArray;
@@ -31,6 +28,7 @@ import java.util.concurrent.TimeoutException;
 import io.realm.Realm;
 import io.realm.RealmQuery;
 import io.realm.RealmResults;
+import io.realm.Sort;
 
 /**
  * Created by sadless on 2016. 1. 17..
@@ -105,17 +103,25 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
                             resultCode = result.optInt(WhooingKeyValues.CODE);
                             if (resultCode == WhooingKeyValues.SUCCESS) {
+                                Realm realm = Realm.getDefaultInstance();
+                                RealmQuery<FrequentItem> query = realm.where(FrequentItem.class)
+                                        .equalTo("sectionId", sectionId)
+                                        .equalTo("slotNumber", slotNumber);
+
+                                query.beginGroup().equalTo("itemId", itemIds.get(0));
                                 ArrayList<Integer> index = slotIndexMap.get(slotNumber);
-                                String itemIdArray = "('" + itemIds.get(0) + "'";
 
                                 for (int i = 1; i < itemIds.size(); i++) {
-                                    itemIdArray += ",'" + itemIds.get(i) + "'";
+                                    query.or().equalTo("itemId", itemIds.get(i));
                                 }
-                                itemIdArray += ")";
-                                getContext().getContentResolver().delete(WhooingProvider.getFrequentItemsUri(sectionId),
-                                        FrequentItems.COLUMN_ITEM_ID + " IN " + itemIdArray + " AND " +
-                                                FrequentItems.COLUMN_SLOT_NUMBER + " = ?",
-                                        new String[]{"" + slotNumber});
+                                query.endGroup();
+
+                                RealmResults<FrequentItem> deletedItems = query.findAll();
+
+                                realm.beginTransaction();
+                                deletedItems.deleteAllFromRealm();
+                                realm.commitTransaction();
+                                realm.close();
                                 for (int i : index) {
                                     selectedItems.set(i, "");
                                 }
@@ -144,33 +150,26 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
                     return resultCode;
                 } else {
+                    Realm realm = Realm.getDefaultInstance();
                     for (String entryId : selectedItems) {
-                        Cursor c = getContext().getContentResolver().query(WhooingProvider.getEntryItemUri(sectionId, Long.parseLong(entryId)),
-                                null,
-                                null,
-                                null,
-                                null);
+                        Entry entry = realm.where(Entry.class).equalTo("sectionId", sectionId)
+                                .equalTo("entryId", Long.parseLong(entryId)).findFirst();
 
-                        if (c == null) {
+                        if (entry == null) {
                             continue;
                         }
-                        c.moveToFirst();
                         args.clear();
                         args.putString(WhooingKeyValues.SECTION_ID, sectionId);
-                        args.putString(WhooingKeyValues.ITEM_TITLE, c.getString(Entries.COLUMN_INDEX_TITLE));
-                        args.putString(WhooingKeyValues.MONEY, "" + c.getDouble(Entries.COLUMN_INDEX_MONEY));
-                        args.putString(WhooingKeyValues.LEFT_ACCOUNT_TYPE,
-                                c.getString(Entries.COLUMN_INDEX_LEFT_ACCOUNT_TYPE));
-                        args.putString(WhooingKeyValues.LEFT_ACCOUNT_ID,
-                                c.getString(Entries.COLUMN_INDEX_LEFT_ACCOUNT_ID));
-                        args.putString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE,
-                                c.getString(Entries.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE));
-                        args.putString(WhooingKeyValues.RIGHT_ACCOUNT_ID,
-                                c.getString(Entries.COLUMN_INDEX_RIGHT_ACCOUNT_ID));
+                        args.putString(WhooingKeyValues.ITEM_TITLE, entry.getTitle());
+                        args.putString(WhooingKeyValues.MONEY, "" + entry.getMoney());
+                        args.putString(WhooingKeyValues.LEFT_ACCOUNT_TYPE, entry.getLeftAccountType());
+                        args.putString(WhooingKeyValues.LEFT_ACCOUNT_ID, entry.getLeftAccountId());
+                        args.putString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE, entry.getRightAccountType());
+                        args.putString(WhooingKeyValues.RIGHT_ACCOUNT_ID, entry.getRightAccountId());
                         resultCode = postFrequentItem(args, slotNumber);
                         mRequestFuture = RequestFuture.newFuture();
-                        c.close();
                     }
+                    realm.close();
 
                     return resultCode;
                 }
@@ -200,23 +199,18 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
                         resultCode = result.optInt(WhooingKeyValues.CODE);
                         if (resultCode == WhooingKeyValues.SUCCESS) {
-                            ContentValues cv = new ContentValues();
+                            Realm realm = Realm.getDefaultInstance();
                             JSONObject resultItem = result.optJSONObject(WhooingKeyValues.RESULT);
+                            String sectionId = args.getString(WhooingKeyValues.SECTION_ID);
+                            FrequentItem frequentItem = realm.where(FrequentItem.class)
+                                    .equalTo("sectionId", sectionId)
+                                    .equalTo("slotNumber", oldSlot)
+                                    .equalTo("itemId", itemId).findFirst();
 
-                            cv.put(FrequentItems.COLUMN_TITLE, resultItem.optString(WhooingKeyValues.ITEM_TITLE));
-                            cv.put(FrequentItems.COLUMN_MONEY, resultItem.optDouble(WhooingKeyValues.MONEY));
-                            cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_TYPE,
-                                    resultItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
-                            cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_ID,
-                                    resultItem.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
-                            cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_TYPE,
-                                    resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
-                            cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_ID,
-                                    resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
-                            getContext().getContentResolver().update(
-                                    WhooingProvider.getFrequentItemUri(args.getString(WhooingKeyValues.SECTION_ID),
-                                            oldSlot,
-                                            itemId), cv, null, null);
+                            realm.beginTransaction();
+                            setFrequentItemFromJson(frequentItem, resultItem, sectionId, oldSlot, -1);
+                            realm.commitTransaction();
+                            realm.close();
                         }
                     } catch (JSONException | InterruptedException | ExecutionException | TimeoutException e) {
                         e.printStackTrace();
@@ -268,19 +262,8 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
                             for (int i = 0; i < itemsInSlot.length(); i++, sortOrder++) {
                                 JSONObject frequentItem = itemsInSlot.optJSONObject(i);
-                                FrequentItem object = new FrequentItem();
+                                FrequentItem object = createFrequentItemObjectFromJson(frequentItem, sectionId, slotNumber, i);
 
-                                object.setSectionId(sectionId);
-                                object.setSlotNumber(slotNumber);
-                                object.setItemId(frequentItem.optString(WhooingKeyValues.ITEM_ID));
-                                object.setTitle(frequentItem.optString(WhooingKeyValues.ITEM_TITLE));
-                                object.setMoney(frequentItem.optDouble(WhooingKeyValues.MONEY));
-                                object.setLeftAccountType(frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
-                                object.setLeftAccountId(frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
-                                object.setRightAccountType(frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
-                                object.setRightAccountId(frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
-                                object.setSortOrder(sortOrder);
-                                object.composePrimaryKey();
                                 query.notEqualTo("primaryKey", object.getPrimaryKey());
                                 objects.add(object);
                             }
@@ -318,21 +301,16 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
     private int deleteFrequentItem(String sectionId, int slotNumber, String itemId) {
         Uri.Builder builder = Uri.parse(URI_FREQUENT_ITEMS).buildUpon();
         int resultCode;
+        Realm realm = Realm.getDefaultInstance();
 
         if (mMethod == Request.Method.PUT) {
-            Cursor c = getContext().getContentResolver().query(WhooingProvider.getFrequentItemUri(sectionId,
-                    slotNumber,
-                    itemId),
-                    new String[]{FrequentItems.COLUMN_USE_COUNT, FrequentItems.COLUMN_LAST_USE_TIME},
-                    null,
-                    null,
-                    null);
+            FrequentItem frequentItem = realm.where(FrequentItem.class).equalTo("sectionId", sectionId)
+                    .equalTo("slotNumber", slotNumber)
+                    .equalTo("itemId", itemId).findFirst();
 
-            if (c != null) {
-                c.moveToFirst();
-                mUseCount = c.getInt(0);
-                mLastUseTime = c.getLong(1);
-                c.close();
+            if (frequentItem != null) {
+                mUseCount = frequentItem.getUseCount();
+                mLastUseTime = frequentItem.getLastUseTime();
             } else {
                 mUseCount = 0;
                 mLastUseTime = 0;
@@ -352,14 +330,19 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
             resultCode = result.optInt(WhooingKeyValues.CODE);
             if (resultCode == WhooingKeyValues.SUCCESS) {
-                getContext().getContentResolver().delete(WhooingProvider.getFrequentItemUri(sectionId,
-                        slotNumber,
-                        itemId), null, null);
+                FrequentItem frequentItem = realm.where(FrequentItem.class).equalTo("sectionId", sectionId)
+                        .equalTo("slotNumber", slotNumber)
+                        .equalTo("itemId", itemId).findFirst();
+
+                realm.beginTransaction();
+                frequentItem.deleteFromRealm();
+                realm.commitTransaction();
             }
         } catch (JSONException | InterruptedException | ExecutionException | TimeoutException e) {
             e.printStackTrace();
             resultCode = -1;
         }
+        realm.close();
 
         return resultCode;
     }
@@ -383,41 +366,30 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                 JSONObject resultItem = result.optJSONObject(WhooingKeyValues.RESULT);
 
                 if (resultItem != null) {
-                    ContentValues cv = new ContentValues();
-                    Cursor c = getContext().getContentResolver().query(WhooingProvider.getFrequentItemsUri(
-                            args.getString(WhooingKeyValues.SECTION_ID)),
-                            new String[] {FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_SORT_ORDER},
-                            null,
-                            null,
-                            FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_SORT_ORDER + " DESC");
+                    Realm realm = Realm.getDefaultInstance();
+                    String sectionId = args.getString(WhooingKeyValues.SECTION_ID);
+                    RealmResults<FrequentItem> frequentItems = realm.where(FrequentItem.class)
+                            .equalTo("sectionId", sectionId)
+                            .findAllSorted("sortOrder", Sort.DESCENDING);
+                    int sortOrder;
 
-                    if (c != null) {
-                        if (c.moveToFirst()) {
-                            cv.put(FrequentItems.COLUMN_SORT_ORDER, c.getInt(0) + 1);
-                        } else {
-                            cv.put(FrequentItems.COLUMN_SORT_ORDER, 0);
-                        }
-                        c.close();
+                    if (frequentItems.size() > 0) {
+                        sortOrder = frequentItems.get(0).getSortOrder() + 1;
+                    } else {
+                        sortOrder = 0;
                     }
-                    cv.put(FrequentItems.COLUMN_SLOT_NUMBER, slotNumber);
-                    cv.put(FrequentItems.COLUMN_ITEM_ID, resultItem.optString(WhooingKeyValues.ITEM_ID));
-                    cv.put(FrequentItems.COLUMN_TITLE, resultItem.optString(WhooingKeyValues.ITEM_TITLE));
-                    cv.put(FrequentItems.COLUMN_MONEY, resultItem.optDouble(WhooingKeyValues.MONEY));
-                    cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_TYPE,
-                            resultItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
-                    cv.put(FrequentItems.COLUMN_LEFT_ACCOUNT_ID,
-                            resultItem.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
-                    cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_TYPE,
-                            resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
-                    cv.put(FrequentItems.COLUMN_RIGHT_ACCOUNT_ID,
-                            resultItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
+
+                    FrequentItem frequentItem = createFrequentItemObjectFromJson(resultItem,
+                            sectionId, slotNumber, sortOrder);
+
                     if (mMethod == Request.Method.PUT) {
-                        cv.put(FrequentItems.COLUMN_USE_COUNT, mUseCount);
-                        cv.put(FrequentItems.COLUMN_LAST_USE_TIME, mLastUseTime);
+                        frequentItem.setUseCount(mUseCount);
+                        frequentItem.setLastUseTime(mLastUseTime);
                     }
-                    getContext().getContentResolver().insert(WhooingProvider.getFrequentItemsUri(
-                                    args.getString(WhooingKeyValues.SECTION_ID)),
-                            cv);
+                    realm.beginTransaction();
+                    realm.copyToRealm(frequentItem);
+                    realm.commitTransaction();
+                    realm.close();
                 }
             }
         } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
@@ -427,5 +399,27 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
         }
 
         return resultCode;
+    }
+
+    private FrequentItem createFrequentItemObjectFromJson(JSONObject frequentItem, String sectionId, int slotNumber, int sortOrder) {
+        FrequentItem object = new FrequentItem();
+
+        object.setSectionId(sectionId);
+        object.setSlotNumber(slotNumber);
+        object.setItemId(frequentItem.optString(WhooingKeyValues.ITEM_ID));
+        object.setSortOrder(sortOrder);
+        setFrequentItemFromJson(object, frequentItem, sectionId, slotNumber, sortOrder);
+        object.composePrimaryKey();
+
+        return object;
+    }
+
+    private void setFrequentItemFromJson(FrequentItem object, JSONObject frequentItem, String sectionId, int slotNumber, int sortOrder) {
+        object.setTitle(frequentItem.optString(WhooingKeyValues.ITEM_TITLE));
+        object.setMoney(frequentItem.optDouble(WhooingKeyValues.MONEY));
+        object.setLeftAccountType(frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
+        object.setLeftAccountId(frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_ID));
+        object.setRightAccountType(frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
+        object.setRightAccountId(frequentItem.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
     }
 }

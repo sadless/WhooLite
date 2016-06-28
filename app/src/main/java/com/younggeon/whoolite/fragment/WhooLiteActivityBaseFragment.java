@@ -97,6 +97,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
             if (!sectionId.equals(mSectionId)) {
                 setSectionId(intent.getStringExtra(Actions.EXTRA_SECTION_ID));
+                mRetryButton.setVisibility(View.GONE);
+                mEmptyText.setVisibility(View.GONE);
+                mProgressBar.setVisibility(View.VISIBLE);
                 getLoaderManager().restartLoader(LOADER_ID_REFRESH_MAIN_DATA,
                         null,
                         WhooLiteActivityBaseFragment.this).forceLoad();
@@ -614,7 +617,11 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         @Override
         public int getItemCount() {
-            return getDataCount() + mSectionTitles.length;
+            if (mSectionTitles != null) {
+                return getDataCount() + mSectionTitles.length;
+            } else {
+                return getDataCount();
+            }
         }
 
         @Override
