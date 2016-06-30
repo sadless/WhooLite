@@ -6,5 +6,5 @@ package com.younggeon.whoolite.constant;
 public class PreferenceKeys {
     public static final String API_KEY_FORMAT = "api_key_format";
     public static final String CURRENT_SECTION_ID = "current_section_id";
-    public static final String ID_FOR_TRACKER = "id_for_tracker";
+    public static final String MIGRATE_TO_REALM = "migrate_to_realm";
 }
