@@ -3,6 +3,8 @@ package com.younggeon.whoolite.activity;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.design.widget.TabLayout;
@@ -34,8 +36,12 @@ import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.constant.Actions;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
+import com.younggeon.whoolite.db.schema.FrequentItems;
+import com.younggeon.whoolite.db.schema.Sections;
 import com.younggeon.whoolite.fragment.FrequentlyInputFragment;
 import com.younggeon.whoolite.fragment.HistoryFragment;
+import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.FrequentItem;
 import com.younggeon.whoolite.realm.Section;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.AccountsLoader;
@@ -60,8 +66,8 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        String apiKeyFormat = PreferenceManager.getDefaultSharedPreferences(this)
-                .getString(PreferenceKeys.API_KEY_FORMAT, null);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String apiKeyFormat = prefs.getString(PreferenceKeys.API_KEY_FORMAT, null);
 
         if (apiKeyFormat == null) {
             startActivity(new Intent(this, WelcomeActivity.class));
@@ -147,6 +153,64 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
             tabLayout.setupWithViewPager(pager);
         }
         Utility.setAdView(mAdView = (AdView) findViewById(R.id.adview));
+        if (!prefs.getBoolean(PreferenceKeys.MIGRATE_TO_REALM, false)) {
+            new AsyncTask<Void, Void, Void>() {
+                @Override
+                protected Void doInBackground(Void... params) {
+                    Cursor c = getContentResolver().query(WhooingProvider.getSectionsUri(),
+                            new String[] {Sections.COLUMN_SECTION_ID},
+                            null,
+                            null,
+                            null);
+
+                    if (c != null) {
+                        if (c.moveToFirst()) {
+                            Realm realm = Realm.getDefaultInstance();
+
+                            realm.beginTransaction();
+                            do {
+                                String sectionId = c.getString(0);
+                                Cursor d = getContentResolver().query(WhooingProvider.getFrequentItemsUri(sectionId),
+                                        null,
+                                        null,
+                                        null,
+                                        null);
+
+                                if (d != null) {
+                                    if (d.moveToFirst()) {
+                                        FrequentItem object = new FrequentItem();
+
+                                        object.setSectionId(sectionId);
+                                        object.setSlotNumber(d.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER));
+                                        object.setItemId(d.getString(FrequentItems.COLUMN_INDEX_ITEM_ID));
+                                        object.setSortOrder(d.getInt(FrequentItems.COLUMN_INDEX_SORT_ORDER));
+                                        object.setTitle(d.getString(FrequentItems.COLUMN_INDEX_TITLE));
+                                        object.setMoney(d.getDouble(FrequentItems.COLUMN_INDEX_MONEY));
+                                        object.setLeftAccountType(d.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE));
+                                        object.setLeftAccountId(d.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID));
+                                        object.setRightAccountType(d.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE));
+                                        object.setRightAccountId(d.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID));
+                                        object.composePrimaryKey();
+                                        realm.copyToRealmOrUpdate(object);
+                                    }
+                                    d.close();
+                                }
+                                getContentResolver().delete(WhooingProvider.getAccountsUri(sectionId), null, null);
+                                getContentResolver().delete(WhooingProvider.getFrequentItemsUri(sectionId), null, null);
+                                getContentResolver().delete(WhooingProvider.getEntriesUri(sectionId), null, null);
+                            } while (c.moveToNext());
+                            realm.commitTransaction();
+                            realm.close();
+                        }
+                        c.close();
+                    }
+                    getContentResolver().delete(WhooingProvider.getSectionsUri(), null, null);
+
+                    return null;
+                }
+            }.execute();
+            prefs.edit().putBoolean(PreferenceKeys.MIGRATE_TO_REALM, true).apply();
+        }
     }
 
     @Override
