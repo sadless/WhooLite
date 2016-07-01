@@ -19,6 +19,7 @@ public class Entry extends RealmObject {
     private String rightAccountType;
     private String rightAccountId;
     private String memo;
+    private double entryDateRaw;
     @Index
     private int entryDate;
     private int sortOrder;
@@ -119,7 +120,20 @@ public class Entry extends RealmObject {
         this.sortOrder = sortOrder;
     }
 
-    public void composePrimaryKey() {
-        this.primaryKey = sectionId + "|" + entryId;
+    public double getEntryDateRaw() {
+        return entryDateRaw;
+    }
+
+    public void setEntryDateRaw(double entryDateRaw) {
+        this.entryDateRaw = entryDateRaw;
+    }
+
+    public void composeValues() {
+        double temp = entryDateRaw;
+
+        entryDate = (int) temp;
+        temp -= (int) temp;
+        sortOrder = (int)(temp * 10000);
+        primaryKey = sectionId + "|" + entryId;
     }
 }

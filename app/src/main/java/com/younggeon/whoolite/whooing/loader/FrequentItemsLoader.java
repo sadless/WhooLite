@@ -208,7 +208,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                                     .equalTo("itemId", itemId).findFirst();
 
                             realm.beginTransaction();
-                            setFrequentItemFromJson(frequentItem, resultItem, sectionId, oldSlot, -1);
+                            setFrequentItemFromJson(frequentItem, resultItem);
                             realm.commitTransaction();
                             realm.close();
                         }
@@ -387,7 +387,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                         frequentItem.setLastUseTime(mLastUseTime);
                     }
                     realm.beginTransaction();
-                    realm.copyToRealm(frequentItem);
+                    realm.copyToRealmOrUpdate(frequentItem);
                     realm.commitTransaction();
                     realm.close();
                 }
@@ -408,13 +408,13 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
         object.setSlotNumber(slotNumber);
         object.setItemId(frequentItem.optString(WhooingKeyValues.ITEM_ID));
         object.setSortOrder(sortOrder);
-        setFrequentItemFromJson(object, frequentItem, sectionId, slotNumber, sortOrder);
+        setFrequentItemFromJson(object, frequentItem);
         object.composePrimaryKey();
 
         return object;
     }
 
-    private void setFrequentItemFromJson(FrequentItem object, JSONObject frequentItem, String sectionId, int slotNumber, int sortOrder) {
+    private void setFrequentItemFromJson(FrequentItem object, JSONObject frequentItem) {
         object.setTitle(frequentItem.optString(WhooingKeyValues.ITEM_TITLE));
         object.setMoney(frequentItem.optDouble(WhooingKeyValues.MONEY));
         object.setLeftAccountType(frequentItem.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));

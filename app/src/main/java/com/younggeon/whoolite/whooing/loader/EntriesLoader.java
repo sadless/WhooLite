@@ -76,7 +76,7 @@ public class EntriesLoader extends WhooingBaseLoader {
                     if (resultCode == WhooingKeyValues.SUCCESS) {
                         JSONObject resultItem = result.optJSONArray(WhooingKeyValues.RESULT).optJSONObject(0);
 
-                        realm.copyToRealm(createEntryObjectFromJson(resultItem, sectionId));
+                        realm.copyToRealmOrUpdate(createEntryObjectFromJson(resultItem, sectionId));
                     }
                     realm.commitTransaction();
                     realm.close();
@@ -265,14 +265,12 @@ public class EntriesLoader extends WhooingBaseLoader {
         object.setSectionId(sectionId);
         object.setEntryId(entry.optLong(WhooingKeyValues.ENTRY_ID));
         setEntryFromJson(object, entry);
-        object.composePrimaryKey();
+        object.composeValues();
 
         return object;
     }
 
     private void setEntryFromJson(Entry object, JSONObject entry) {
-        double entryDate = entry.optDouble(WhooingKeyValues.ENTRY_DATE);
-
         object.setTitle(entry.optString(WhooingKeyValues.ITEM_TITLE));
         object.setMoney(entry.optDouble(WhooingKeyValues.MONEY));
         object.setLeftAccountType(entry.optString(WhooingKeyValues.LEFT_ACCOUNT_TYPE));
@@ -280,8 +278,6 @@ public class EntriesLoader extends WhooingBaseLoader {
         object.setRightAccountType(entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE));
         object.setRightAccountId(entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
         object.setMemo(entry.optString(WhooingKeyValues.MEMO));
-        object.setEntryDate((int)entryDate);
-        entryDate -= (int) entryDate;
-        object.setSortOrder((int)(entryDate * 10000));
+        object.setEntryDateRaw(entry.optDouble(WhooingKeyValues.ENTRY_DATE));
     }
 }

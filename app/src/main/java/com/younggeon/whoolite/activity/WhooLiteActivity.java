@@ -174,24 +174,29 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
                                         null,
                                         null,
                                         null,
-                                        null);
+                                        FrequentItems.TABLE_NAME + "." + FrequentItems.COLUMN_SORT_ORDER + " ASC");
 
                                 if (d != null) {
                                     if (d.moveToFirst()) {
-                                        FrequentItem object = new FrequentItem();
+                                        int i = 0;
 
-                                        object.setSectionId(sectionId);
-                                        object.setSlotNumber(d.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER));
-                                        object.setItemId(d.getString(FrequentItems.COLUMN_INDEX_ITEM_ID));
-                                        object.setSortOrder(d.getInt(FrequentItems.COLUMN_INDEX_SORT_ORDER));
-                                        object.setTitle(d.getString(FrequentItems.COLUMN_INDEX_TITLE));
-                                        object.setMoney(d.getDouble(FrequentItems.COLUMN_INDEX_MONEY));
-                                        object.setLeftAccountType(d.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE));
-                                        object.setLeftAccountId(d.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID));
-                                        object.setRightAccountType(d.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE));
-                                        object.setRightAccountId(d.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID));
-                                        object.composePrimaryKey();
-                                        realm.copyToRealmOrUpdate(object);
+                                        do {
+                                            FrequentItem object = new FrequentItem();
+
+                                            object.setSectionId(sectionId);
+                                            object.setSlotNumber(d.getInt(FrequentItems.COLUMN_INDEX_SLOT_NUMBER));
+                                            object.setItemId(d.getString(FrequentItems.COLUMN_INDEX_ITEM_ID));
+                                            object.setSortOrder(i);
+                                            object.setTitle(d.getString(FrequentItems.COLUMN_INDEX_TITLE));
+                                            object.setMoney(d.getDouble(FrequentItems.COLUMN_INDEX_MONEY));
+                                            object.setLeftAccountType(d.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_TYPE));
+                                            object.setLeftAccountId(d.getString(FrequentItems.COLUMN_INDEX_LEFT_ACCOUNT_ID));
+                                            object.setRightAccountType(d.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_TYPE));
+                                            object.setRightAccountId(d.getString(FrequentItems.COLUMN_INDEX_RIGHT_ACCOUNT_ID));
+                                            object.composePrimaryKey();
+                                            realm.copyToRealmOrUpdate(object);
+                                            i++;
+                                        } while (d.moveToNext());
                                     }
                                     d.close();
                                 }

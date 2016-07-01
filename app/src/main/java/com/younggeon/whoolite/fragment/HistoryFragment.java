@@ -99,7 +99,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         if (mEntries != null) {
             mEntries.removeChangeListeners();
         }
-        mEntries = mQuery.findAllSorted("entryDate", Sort.DESCENDING).sort("sortOrder", Sort.DESCENDING);
+        mEntries = mQuery.findAllSorted("entryDateRaw", Sort.DESCENDING);
         mEntries.addChangeListener(mDataChangeListener);
         mainDataChanged();
     }
@@ -336,7 +336,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
 
         @Override
         protected void refreshSections() {
-            RealmResults<Entry> items = mQuery.findAllSorted("entryDate", Sort.DESCENDING).sort("sortOrder", Sort.DESCENDING);
+            RealmResults<Entry> items = mQuery.findAllSorted("entryDateRaw", Sort.DESCENDING);
             RealmResults<Entry> dates = items.distinct("entryDate");
 
             mSectionTitles = new String[dates.size()];

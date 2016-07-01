@@ -27,7 +27,6 @@ public class FrequentItems {
     public static final int COLUMN_INDEX_LEFT_ACCOUNT_ID = 6;
     public static final int COLUMN_INDEX_RIGHT_ACCOUNT_TYPE = 7;
     public static final int COLUMN_INDEX_RIGHT_ACCOUNT_ID = 8;
-    public static final int COLUMN_INDEX_SORT_ORDER = 11;
 
     public static final String PREFIX_LEFT = "left";
     public static final String PREFIX_RIGHT = "right";

@@ -129,6 +129,6 @@ public class FrequentItem extends RealmObject {
     }
 
     public void composePrimaryKey() {
-        this.primaryKey = sectionId + "|" + slotNumber + "|" + itemId;
+        primaryKey = sectionId + "|" + slotNumber + "|" + itemId;
     }
 }

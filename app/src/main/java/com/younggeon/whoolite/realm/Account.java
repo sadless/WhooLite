@@ -84,6 +84,6 @@ public class Account extends RealmObject {
     }
 
     public void composePrimaryKey() {
-        this.primaryKey = sectionId + "|" + accountType + "|" + accountId;
+        primaryKey = sectionId + "|" + accountType + "|" + accountId;
     }
 }
