@@ -131,10 +131,10 @@ public class EntriesLoader extends WhooingBaseLoader {
                     String itemIdsPath = "" + selectedItems.get(0);
                     Uri.Builder builder = Uri.parse(URI_ENTRIES).buildUpon();
 
-                    query.beginGroup().equalTo("entryId", selectedItems.get(0));
+                    query.beginGroup().equalTo("entryId", Long.parseLong(selectedItems.get(0)));
                     for (int i = 1; i < selectedItems.size(); i++) {
                         itemIdsPath += "," + selectedItems.get(i);
-                        query.or().equalTo("entryId", selectedItems.get(0));
+                        query.or().equalTo("entryId", Long.parseLong(selectedItems.get(i)));
                     }
                     query.endGroup();
                     builder.appendEncodedPath(itemIdsPath + ".json");

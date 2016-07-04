@@ -48,6 +48,7 @@ import java.util.Currency;
 
 import io.realm.Realm;
 import io.realm.RealmChangeListener;
+import io.realm.RealmModel;
 import io.realm.RealmQuery;
 import io.realm.RealmResults;
 
@@ -76,6 +77,8 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     protected ArrayList<String> mSelectedItems;
     protected String mProgressTitle;
     protected Realm mRealm;
+    private boolean mSectionReady = false;
+    private boolean mAccountsReady = false;
 
     protected ActionMode mActionMode;
     protected RecyclerView mRecyclerView;
@@ -89,6 +92,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     private AlertDialog mDeleteConfirmDialog;
     private RealmQuery<Account> mAccountQuery;
     private RealmResults<Account> mAccounts;
+    private Section mSection;
 
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -154,7 +158,12 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             @Override
             public void onChange(RealmResults<Account> element) {
                 if (WhooLiteActivityBaseFragment.this.isAdded()) {
-                    mainDataChanged();
+                    synchronized (WhooLiteActivityBaseFragment.this) {
+                        mAccountsReady = true;
+                        if (mSectionReady) {
+                            refreshMainData();
+                        }
+                    }
                 }
             }
         });
@@ -169,16 +178,17 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         getActivity().unregisterReceiver(mReceiver);
         mAccounts.removeChangeListeners();
+        if (mSection != null) {
+            mSection.removeChangeListeners();
+        }
         mRealm.close();
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
+    public void onPause() {
+        super.onPause();
 
-        if (mActionMode == null && mSectionId != null && getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) == null) {
-            getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA, null, this).forceLoad();
-        }
+        mSectionReady = mAccountsReady = false;
     }
 
     @Override
@@ -303,6 +313,19 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
             Section section = Realm.getDefaultInstance().where(Section.class).equalTo("sectionId", sectionId).findFirst();
 
+            if (section != null) {
+                section.removeChangeListeners();
+                section.addChangeListener(new RealmChangeListener<RealmModel>() {
+                    @Override
+                    public void onChange(RealmModel element) {
+                        synchronized (WhooLiteActivityBaseFragment.this) {
+                            sectionReady();
+                        }
+                    }
+                });
+                mSection = section;
+                sectionReady();
+            }
             getDataFromSection(section);
         }
     }
@@ -345,6 +368,21 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
         loader.args = args;
         loader.forceLoad();
+    }
+
+    private void refreshMainData() {
+        if (mActionMode == null && mSectionId != null && getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) == null) {
+            getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA, null, this).forceLoad();
+        }
+    }
+
+    private void sectionReady() {
+        synchronized (this) {
+            mSectionReady = true;
+            if (mAccountsReady) {
+                mainDataChanged();
+            }
+        }
     }
 
     protected void mainDataChanged() {

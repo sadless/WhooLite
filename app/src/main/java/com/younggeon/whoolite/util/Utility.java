@@ -54,9 +54,12 @@ public class Utility {
                 .remove(PreferenceKeys.API_KEY_FORMAT)
                 .remove(PreferenceKeys.CURRENT_SECTION_ID)
                 .remove(context.getString(R.string.pref_key_show_slot_numbers)).apply();
+        realm.removeAllChangeListeners();
+        realm.beginTransaction();
         realm.delete(Section.class);
         realm.delete(Account.class);
         realm.delete(FrequentItem.class);
+        realm.commitTransaction();
         realm.close();
         context.sendBroadcast(new Intent(Actions.FINISH));
         context.startActivity(new Intent(context, WelcomeActivity.class));

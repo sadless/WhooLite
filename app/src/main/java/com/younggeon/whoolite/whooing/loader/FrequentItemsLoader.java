@@ -106,7 +106,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                                 Realm realm = Realm.getDefaultInstance();
                                 RealmQuery<FrequentItem> query = realm.where(FrequentItem.class)
                                         .equalTo("sectionId", sectionId)
-                                        .equalTo("slotNumber", slotNumber);
+                                        .equalTo("slotNumber", Integer.parseInt(slotNumber));
 
                                 query.beginGroup().equalTo("itemId", itemIds.get(0));
                                 ArrayList<Integer> index = slotIndexMap.get(slotNumber);
