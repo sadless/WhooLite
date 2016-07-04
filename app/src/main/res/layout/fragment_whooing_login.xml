@@ -1,42 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:minWidth="300dp"
-    android:minHeight="480dp">
-
-    <WebView
-        android:id="@+id/login_webview"
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+    <data>
+        <import type="android.view.View"/>
+        <variable
+            name="fragment"
+            type="com.younggeon.whoolite.fragment.WhooingLoginActivityFragment" />
+        <variable
+            name="token"
+            type="android.databinding.ObservableField" />
+    </data>
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:minWidth="300dp"
+        android:minHeight="480dp">
 
-    <ProgressBar
-        android:id="@+id/progress"
-        style="?android:attr/progressBarStyleLarge"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center" />
+        <WebView
+            android:id="@+id/loginWebView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
 
-    <LinearLayout
-        android:id="@+id/failed_layout"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone"
-        android:padding="16dp">
-        <TextView
+        <ProgressBar
+            android:id="@+id/progress"
+            style="?android:attr/progressBarStyleLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
-            android:text="@string/failed_to_receive_token"
-            android:textAppearance="@style/TextAppearance.AppCompat.Medium"/>
-        <Button
-            android:id="@+id/retry"
+            android:layout_gravity="center"
+            android:visibility="@{token.get() == null ? View.VISIBLE : View.GONE}"/>
+
+        <LinearLayout
+            android:id="@+id/failed_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="10dp"
-            android:text="@string/retry"/>
-    </LinearLayout>
-</FrameLayout>
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:padding="16dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:text="@string/failed_to_receive_token"
+                android:textAppearance="@style/TextAppearance.AppCompat.Medium"/>
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="10dp"
+                android:text="@string/retry"
+                android:onClick="@{() -> fragment.retryClicked()}"/>
+        </LinearLayout>
+    </FrameLayout>
+</layout>
