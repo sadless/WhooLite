@@ -8,33 +8,36 @@
         <variable
             name="token"
             type="android.databinding.ObservableField" />
+        <variable
+            name="failed"
+            type="android.databinding.ObservableBoolean" />
+        <variable
+            name="pin"
+            type="android.databinding.ObservableField" />
     </data>
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:minWidth="300dp"
-        android:minHeight="480dp">
+        android:layout_height="match_parent">
 
         <WebView
             android:id="@+id/loginWebView"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:visibility="@{!failed.get() &amp;&amp; token.get() != null &amp;&amp; pin.get() == null ? View.VISIBLE : View.GONE}"/>
 
         <ProgressBar
-            android:id="@+id/progress"
             style="?android:attr/progressBarStyleLarge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:visibility="@{token.get() == null ? View.VISIBLE : View.GONE}"/>
+            android:visibility="@{!failed.get() &amp;&amp; (token.get() == null || pin.get() != null) ? View.VISIBLE : View.GONE}"/>
 
         <LinearLayout
-            android:id="@+id/failed_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:orientation="vertical"
-            android:visibility="gone"
+            android:visibility="@{failed.get() ? View.VISIBLE : View.GONE}"
             android:padding="16dp">
             <TextView
                 android:layout_width="wrap_content"
