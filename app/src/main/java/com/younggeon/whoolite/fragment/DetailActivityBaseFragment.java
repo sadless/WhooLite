@@ -1,6 +1,8 @@
 package com.younggeon.whoolite.fragment;
 
 import android.app.ProgressDialog;
+import android.databinding.DataBindingUtil;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -21,6 +23,7 @@ import android.widget.TextView;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
+import com.younggeon.whoolite.databinding.SpinnerItemAccountBinding;
 import com.younggeon.whoolite.realm.Account;
 
 import io.realm.Realm;
@@ -224,16 +227,14 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         public static final int DIRECTION_RIGHT = 2;
 
         private int mDirection;
-        private int mItemPadding;
-        private int mTypePadding;
         private String[] mTypes;
         private int[] mTypeCounts;
 
         public AccountsAdapter(int direction) {
             this.mDirection = direction;
             refresh();
-            mItemPadding = getResources().getDimensionPixelSize(R.dimen.account_item_padding);
-            mTypePadding = getResources().getDimensionPixelSize(R.dimen.account_type_padding);
+//            mItemPadding = getResources().getDimensionPixelSize(R.dimen.account_item_padding);
+//            mTypePadding = getResources().getDimensionPixelSize(R.dimen.account_type_padding);
         }
 
         @Override
@@ -306,38 +307,29 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         @Override
         public View getDropDownView(int position, View convertView, ViewGroup parent) {
             if (convertView == null) {
-                convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.spinner_item_with_memo,
+                SpinnerItemAccountBinding binding = DataBindingUtil.bind(LayoutInflater.from(parent.getContext()).inflate(R.layout.spinner_item_account,
                         parent,
-                        false);
-                convertView.setTag(new ViewHolder((TextView) convertView.findViewById(R.id.text1),
-                        (TextView) convertView.findViewById(R.id.text2),
-                        convertView.getBackground()));
+                        false));
+
+                convertView = binding.getRoot();
+                binding.setDefaultBackground(convertView.getBackground());
+                convertView.setTag(binding);
             }
 
-            ViewHolder vh = (ViewHolder) convertView.getTag();
+            SpinnerItemAccountBinding binding = (SpinnerItemAccountBinding) convertView.getTag();
 
             switch (position) {
                 case 0: {
-                    convertView.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
-                    if (Build.VERSION.SDK_INT >= 16) {
-                        convertView.setBackground(vh.background);
-                    } else {
-                        convertView.setBackgroundDrawable(vh.background);
-                    }
-                    vh.main.setText(R.string.not_assigned);
-                    vh.sub.setVisibility(View.GONE);
+                    binding.setSelectable(true);
+                    binding.setTitle(getString(R.string.not_assigned));
+                    binding.setMemo(null);
                     break;
                 }
                 default: {
                     if (position == getCount() - 1) {
-                        convertView.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
-                        if (Build.VERSION.SDK_INT >= 16) {
-                            convertView.setBackground(vh.background);
-                        } else {
-                            convertView.setBackgroundDrawable(vh.background);
-                        }
-                        vh.main.setText(R.string.unknown);
-                        vh.sub.setVisibility(View.GONE);
+                        binding.setSelectable(true);
+                        binding.setTitle(getString(R.string.unknown));
+                        binding.setMemo(null);
                         break;
                     }
                     position--;
@@ -347,8 +339,12 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
 
                     for (int i = 0; i < mTypeCounts.length; i++) {
                         if (position == sum + i) {
-                            convertView.setPadding(mTypePadding, mTypePadding, mTypePadding, mTypePadding);
-                            convertView.setBackgroundResource(R.color.primary);
+                            if (Build.VERSION.SDK_INT >= 23) {
+                                binding.setColorBackground(new ColorDrawable(getResources().getColor(R.color.primary, null)));
+                            } else {
+                                binding.setColorBackground(new ColorDrawable(getResources().getColor(R.color.primary)));
+                            }
+                            binding.setSelectable(false);
 
                             String title = null;
 
@@ -408,8 +404,8 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                                 }
                                 default:
                             }
-                            vh.main.setText(title);
-                            vh.sub.setVisibility(View.GONE);
+                            binding.setTitle(title);
+                            binding.setMemo(null);
                             bound = true;
                             break;
                         }
@@ -419,28 +415,17 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                         Account account = getItem(getCursorPosition(position));
                         String title = account.getTitle();
 
-                        if (account.isGroup()) {
-                            convertView.setPadding(mTypePadding, mTypePadding, mTypePadding, mTypePadding);
-                            convertView.setBackgroundResource(R.color.primary_dark);
+                        if (Build.VERSION.SDK_INT >= 23) {
+                            binding.setColorBackground(new ColorDrawable(getResources().getColor(R.color.primary_dark, null)));
                         } else {
-                            convertView.setPadding(mItemPadding, mItemPadding, mItemPadding, mItemPadding);
-                            if (Build.VERSION.SDK_INT >= 16) {
-                                convertView.setBackground(vh.background);
-                            } else {
-                                convertView.setBackgroundDrawable(vh.background);
-                            }
+                            binding.setColorBackground(new ColorDrawable(getResources().getColor(R.color.primary_dark)));
+                        }
+                        binding.setSelectable(!account.isGroup());
+                        if (!account.isGroup()) {
                             title = addSign(title, account.getAccountType());
                         }
-
-                        String memo = account.getMemo();
-
-                        vh.main.setText(title);
-                        if (TextUtils.isEmpty(memo)) {
-                            vh.sub.setVisibility(View.GONE);
-                        } else {
-                            vh.sub.setText(memo);
-                            vh.sub.setVisibility(View.VISIBLE);
-                        }
+                        binding.setTitle(title);
+                        binding.setMemo(account.getMemo());
                     }
                     break;
                 }

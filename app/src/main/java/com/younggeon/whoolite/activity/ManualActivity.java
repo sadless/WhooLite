@@ -1,46 +1,47 @@
 package com.younggeon.whoolite.activity;
 
 import android.content.Intent;
+import android.databinding.DataBindingUtil;
+import android.databinding.ObservableBoolean;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.View;
-import android.widget.Button;
 
 import com.younggeon.whoolite.R;
+import com.younggeon.whoolite.databinding.ActivityManualBinding;
 import com.younggeon.whoolite.fragment.ManualActivityFragment;
 
 public class ManualActivity extends AppCompatActivity {
     private static final String INSTANCE_STATE_START_ENABLED = "start_enabled";
 
-    private ViewPager mPager;
-    private Button mNextButton;
     private MenuItem mSkipMenuItem;
+    private ActivityManualBinding mBinding;
 
-    private boolean mStartEnabled = false;
+    private ObservableBoolean mStartEnabled;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_manual);
-
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
-
-        setSupportActionBar(toolbar);
-
-        mPager = (ViewPager) findViewById(R.id.pager);
+        if (savedInstanceState == null) {
+            mStartEnabled = new ObservableBoolean(false);
+        } else {
+            mStartEnabled = new ObservableBoolean(savedInstanceState.getBoolean(INSTANCE_STATE_START_ENABLED));
+        }
+        mBinding = DataBindingUtil.setContentView(this, R.layout.activity_manual);
+        mBinding.setActivity(this);
+        mBinding.setStartEnabled(mStartEnabled);
+        setSupportActionBar(mBinding.toolbar);
 
         ManualPagerAdapter adapter = new ManualPagerAdapter(getSupportFragmentManager());
 
-        mPager.setAdapter(adapter);
-        mPager.setOffscreenPageLimit(adapter.getCount());
-        mPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+        mBinding.viewPager.setAdapter(adapter);
+        mBinding.viewPager.setOffscreenPageLimit(adapter.getCount());
+        mBinding.viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
             @Override
             public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
 
@@ -48,8 +49,9 @@ public class ManualActivity extends AppCompatActivity {
 
             @Override
             public void onPageSelected(int position) {
-                if (position == mPager.getAdapter().getCount() - 1) {
-                    enableStart();
+                if (position == mBinding.viewPager.getAdapter().getCount() - 1) {
+                    mStartEnabled.set(true);
+                    mSkipMenuItem.setTitle(R.string.start);
                 }
             }
 
@@ -58,38 +60,20 @@ public class ManualActivity extends AppCompatActivity {
 
             }
         });
-        mNextButton = (Button) findViewById(R.id.next);
-        mNextButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (mPager.getCurrentItem() < mPager.getAdapter().getCount() - 1) {
-                    mPager.setCurrentItem(mPager.getCurrentItem() + 1);
-                } else {
-                    startActivity(new Intent(ManualActivity.this, WhooLiteActivity.class));
-                    finish();
-                }
-            }
-        });
-        if (savedInstanceState != null) {
-            mStartEnabled = savedInstanceState.getBoolean(INSTANCE_STATE_START_ENABLED);
-            if (mStartEnabled) {
-                enableStart();
-            }
-        }
     }
 
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
 
-        outState.putBoolean(INSTANCE_STATE_START_ENABLED, mStartEnabled);
+        outState.putBoolean(INSTANCE_STATE_START_ENABLED, mStartEnabled.get());
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_manual, menu);
         mSkipMenuItem = menu.getItem(0);
-        if (mStartEnabled) {
+        if (mStartEnabled.get()) {
             mSkipMenuItem.setTitle(R.string.start);
         }
 
@@ -111,12 +95,13 @@ public class ManualActivity extends AppCompatActivity {
         }
     }
 
-    private void enableStart() {
-        mNextButton.setText(R.string.start);
-        if (mSkipMenuItem != null) {
-            mSkipMenuItem.setTitle(R.string.start);
+    public void nextClicked() {
+        if (mBinding.viewPager.getCurrentItem() < mBinding.viewPager.getAdapter().getCount() - 1) {
+            mBinding.viewPager.setCurrentItem(mBinding.viewPager.getCurrentItem() + 1);
+        } else {
+            startActivity(new Intent(ManualActivity.this, WhooLiteActivity.class));
+            finish();
         }
-        mStartEnabled = true;
     }
 
     private class ManualPagerAdapter extends FragmentPagerAdapter {
