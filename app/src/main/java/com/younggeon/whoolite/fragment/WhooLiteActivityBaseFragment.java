@@ -7,6 +7,10 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.databinding.DataBindingUtil;
+import android.databinding.ObservableBoolean;
+import android.databinding.ObservableField;
+import android.databinding.ObservableInt;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -25,10 +29,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.amulyakhare.textdrawable.TextDrawable;
@@ -37,6 +38,8 @@ import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.constant.Actions;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
+import com.younggeon.whoolite.databinding.FragmentWhooLiteBaseBinding;
+import com.younggeon.whoolite.databinding.RecyclerItemWhooliteSectionBinding;
 import com.younggeon.whoolite.realm.Account;
 import com.younggeon.whoolite.realm.Section;
 import com.younggeon.whoolite.util.Utility;
@@ -69,30 +72,29 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     abstract protected int getDataCount();
     abstract protected void sectionChanged();
 
-    protected int mReceiveFailedStringId;
-    protected int mNoDataStringId;
     protected int mDeleteConfirmStringId;
     protected int mActionMenuId;
     protected String mSectionId;
     protected ArrayList<String> mSelectedItems;
     protected String mProgressTitle;
     protected Realm mRealm;
-    private boolean mSectionReady = false;
-    private boolean mAccountsReady = false;
+    protected ObservableInt mDataCount;
+    protected ObservableField<String> mQueryText;
 
     protected ActionMode mActionMode;
-    protected RecyclerView mRecyclerView;
-    protected Button mRetryButton;
-    protected TextView mEmptyText;
-    protected ProgressBar mProgressBar;
+    protected FragmentWhooLiteBaseBinding mBinding;
     protected ProgressDialog mProgressDialog;
 
-    private Currency mCurrency;
-    private LinearLayout mEmptyLayout;
     private AlertDialog mDeleteConfirmDialog;
+
+    private Currency mCurrency;
     private RealmQuery<Account> mAccountQuery;
     private RealmResults<Account> mAccounts;
     private Section mSection;
+    private boolean mSectionReady = false;
+    private boolean mAccountsReady = false;
+    private ObservableBoolean mReceived;
+    private ObservableBoolean mFailed;
 
     private BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -101,9 +103,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
             if (!sectionId.equals(mSectionId)) {
                 setSectionId(intent.getStringExtra(Actions.EXTRA_SECTION_ID));
-                mRetryButton.setVisibility(View.GONE);
-                mEmptyText.setVisibility(View.GONE);
-                mProgressBar.setVisibility(View.VISIBLE);
                 getLoaderManager().restartLoader(LOADER_ID_REFRESH_MAIN_DATA,
                         null,
                         WhooLiteActivityBaseFragment.this).forceLoad();
@@ -115,10 +114,16 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_whoo_lite_base, container, false);
+        mBinding = DataBindingUtil.bind(inflater.inflate(R.layout.fragment_whoo_lite_base, container, false));
+        mBinding.setFragment(this);
+        mBinding.setDataCount(mDataCount = new ObservableInt());
+        mBinding.setReceived(mReceived = new ObservableBoolean(false));
+        mBinding.setFailed(mFailed = new ObservableBoolean(false));
+        mBinding.setQueryText(mQueryText = new ObservableField<>());
+        mBinding.setNoSearchResultText(getString(R.string.no_search_result));
+
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
 
-        mRecyclerView = (RecyclerView) view.findViewById(R.id.list);
         if (savedInstanceState != null) {
             mSelectedItems = savedInstanceState.getStringArrayList(INSTANCE_STATE_SELECTED_ITEMS);
 
@@ -136,21 +141,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         }
         mRealm = Realm.getDefaultInstance();
         setSectionId(prefs.getString(PreferenceKeys.CURRENT_SECTION_ID, null));
-        mProgressBar = (ProgressBar) view.findViewById(R.id.progress);
-        mEmptyLayout = (LinearLayout) view.findViewById(R.id.empty_layout);
-        mEmptyText = (TextView) view.findViewById(R.id.empty_text);
-        mRetryButton = (Button) view.findViewById(R.id.retry);
-        mRetryButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mEmptyText.setVisibility(View.GONE);
-                mRetryButton.setVisibility(View.GONE);
-                mProgressBar.setVisibility(View.VISIBLE);
-                getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA,
-                        null,
-                        WhooLiteActivityBaseFragment.this).forceLoad();
-            }
-        });
         getActivity().registerReceiver(mReceiver, new IntentFilter(Actions.SECTION_ID_CHANGED));
         mAccountQuery = mRealm.where(Account.class).equalTo("sectionId", mSectionId);
         mAccounts = mAccountQuery.findAll();
@@ -169,7 +159,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         });
         getLoaderManager().initLoader(LOADER_ID_DELETE_SELECTED_ITEMS, null, this);
 
-        return view;
+        return mBinding.getRoot();
     }
 
     @Override
@@ -248,14 +238,12 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
                 if (code > 0) {
                     if (Utility.checkResultCodeWithAlert(getActivity(), code)) {
-                        mEmptyText.setText(mNoDataStringId);
+                        mReceived.set(true);
+                        mFailed.set(false);
                     }
                 } else {
-                    mEmptyText.setText(mReceiveFailedStringId);
+                    mFailed.set(true);
                 }
-                mRetryButton.setVisibility(View.VISIBLE);
-                mEmptyText.setVisibility(View.VISIBLE);
-                mProgressBar.setVisibility(View.GONE);
                 getLoaderManager().destroyLoader(LOADER_ID_REFRESH_MAIN_DATA);
                 break;
             }
@@ -275,7 +263,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         mode.getMenuInflater().inflate(mActionMenuId, menu);
         mode.setTitle(getString(R.string.item_selected,
                 mSelectedItems.size()));
-        mRecyclerView.getAdapter().notifyDataSetChanged();
+        mBinding.recyclerView.getAdapter().notifyDataSetChanged();
 
         return true;
     }
@@ -303,7 +291,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     public void onDestroyActionMode(ActionMode mode) {
         mActionMode = null;
         mSelectedItems = null;
-        mRecyclerView.getAdapter().notifyDataSetChanged();
+        mBinding.recyclerView.getAdapter().notifyDataSetChanged();
     }
 
     protected void setSectionId(String sectionId) {
@@ -385,32 +373,33 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         }
     }
 
+    public void retryClicked() {
+        mFailed.set(false);
+        getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA,
+                null,
+                this).forceLoad();
+    }
+
     protected void mainDataChanged() {
-        WhooLiteAdapter adapter = (WhooLiteAdapter) mRecyclerView.getAdapter();
+        WhooLiteAdapter adapter = (WhooLiteAdapter) mBinding.recyclerView.getAdapter();
 
         if (adapter == null) {
-            mRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(),
+            mBinding.recyclerView.setLayoutManager(new GridLayoutManager(getActivity(),
                     getResources().getInteger(R.integer.input_item_span_count)));
-            mRecyclerView.setAdapter(createAdapter((GridLayoutManager) mRecyclerView.getLayoutManager()));
+            mBinding.recyclerView.setAdapter(createAdapter((GridLayoutManager) mBinding.recyclerView.getLayoutManager()));
         } else {
             adapter.refresh();
         }
-        if (getDataCount() > 0) {
-            mRecyclerView.setVisibility(View.VISIBLE);
-            mEmptyLayout.setVisibility(View.GONE);
-        } else {
-            mRecyclerView.setVisibility(View.GONE);
-            mEmptyLayout.setVisibility(View.VISIBLE);
-        }
+        mDataCount.set(getDataCount());
     }
 
     protected class SectionViewHolder extends RecyclerView.ViewHolder {
-        public TextView name;
+        public RecyclerItemWhooliteSectionBinding binding;
 
         public SectionViewHolder(View itemView) {
             super(itemView);
 
-            name = (TextView) itemView.findViewById(android.R.id.text1);
+            binding = DataBindingUtil.bind(itemView);
         }
     }
 
@@ -555,7 +544,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                         if (position <= sum + i) {
                             SectionViewHolder vh = (SectionViewHolder) holder;
 
-                            vh.name.setText(mSectionTitles[i]);
+                            vh.binding.setText(mSectionTitles[i]);
                             break;
                         }
                         sum += mSectionDataCounts[i];
@@ -753,7 +742,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             } else {
                 mSelectedItems.add(selectionId);
             }
-            mRecyclerView.getAdapter().notifyItemChanged(position);
+            mBinding.recyclerView.getAdapter().notifyItemChanged(position);
             mActionMode.setTitle(getString(R.string.item_selected,
                     mSelectedItems.size()));
         }

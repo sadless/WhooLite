@@ -67,8 +67,6 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        mReceiveFailedStringId = R.string.failed_to_receive_entries;
-        mNoDataStringId = R.string.no_entries;
         mDeleteConfirmStringId = R.string.delete_entries_confirm;
         mActionMenuId = R.menu.action_menu_history;
     }
@@ -108,6 +106,8 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = super.onCreateView(inflater, container, savedInstanceState);
 
+        mBinding.setReceiveFailedText(getString(R.string.failed_to_receive_entries));
+        mBinding.setNoDataText(getString(R.string.no_entries));
         if (savedInstanceState != null) {
             if (savedInstanceState.getBoolean(INSTANCE_STATE_SHOW_SELECT_SLOT_NUMBER)) {
                 showSelectSlotNumber();

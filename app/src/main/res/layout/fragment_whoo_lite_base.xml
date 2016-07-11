@@ -1,47 +1,76 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    tools:context=".WhooLiteActivityFragment">
-
-    <android.support.v7.widget.RecyclerView
-        android:id="@+id/list"
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <data>
+        <import type="android.view.View" />
+        <variable
+            name="fragment"
+            type="com.younggeon.whoolite.fragment.WhooLiteActivityBaseFragment" />
+        <variable
+            name="dataCount"
+            type="android.databinding.ObservableInt" />
+        <variable
+            name="received"
+            type="android.databinding.ObservableBoolean" />
+        <variable
+            name="failed"
+            type="android.databinding.ObservableBoolean" />
+        <variable
+            name="receiveFailedText"
+            type="String" />
+        <variable
+            name="noDataText"
+            type="String" />
+        <variable
+            name="noSearchResultText"
+            type="String" />
+        <variable
+            name="queryText"
+            type="android.databinding.ObservableField" />
+    </data>
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:padding="5dp"/>
+        tools:context=".WhooLiteActivityBaseFragment">
 
-    <LinearLayout
-        android:id="@+id/empty_layout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginBottom="48dp"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:visibility="gone">
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="5dp"
+            android:visibility="@{dataCount.get() > 0 ? View.VISIBLE : View.GONE}"/>
 
-        <TextView
-            android:id="@+id/empty_text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center_horizontal"
-            android:paddingEnd="16dp"
-            android:paddingStart="16dp"
-            android:textAppearance="@style/TextAppearance.AppCompat.Medium"
-            android:visibility="gone"/>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginBottom="48dp"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:visibility="@{dataCount.get() == 0 ? View.VISIBLE : View.GONE}">
 
-        <Button
-            android:id="@+id/retry"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:text="@string/retry"
-            android:visibility="gone" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center_horizontal"
+                android:paddingEnd="16dp"
+                android:paddingStart="16dp"
+                android:textAppearance="@style/TextAppearance.AppCompat.Medium"
+                android:visibility="@{received.get() || failed.get() ? View.VISIBLE : View.GONE}"
+                android:text="@{queryText.get() == null ? (failed.get() ? receiveFailedText : noDataText) : noSearchResultText}"/>
 
-        <ProgressBar
-            android:id="@+id/progress"
-            style="?android:attr/progressBarStyleLarge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
-    </LinearLayout>
-</FrameLayout>
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="@string/retry"
+                android:visibility="@{(received.get() || failed.get()) &amp;&amp; queryText.get() == null ? View.VISIBLE : View.GONE}"
+                android:onClick="@{() -> fragment.retryClicked()}"/>
+
+            <ProgressBar
+                style="?android:attr/progressBarStyleLarge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:visibility="@{!received.get() &amp;&amp; !failed.get() ? View.VISIBLE : View.GONE}"/>
+        </LinearLayout>
+    </FrameLayout>
+</layout>

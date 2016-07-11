@@ -70,7 +70,6 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     private int mLastLoaderId;
     private ArrayList<Bundle> mMultiInputArgs;
     private Bundle mProgressingItemIdBundle;
-    private String mQueryText;
     private ArrayList<String> mSearchedTitles;
     private RealmQuery<FrequentItem> mQuery;
     private RealmResults<FrequentItem> mFrequentItems;
@@ -81,8 +80,6 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        mReceiveFailedStringId = R.string.failed_to_receive_frequent_item;
-        mNoDataStringId = R.string.no_frequent_items;
         mDeleteConfirmStringId = R.string.delete_frequent_items_confirm;
         mActionMenuId = R.menu.action_menu_frequently_input;
         setHasOptionsMenu(true);
@@ -95,7 +92,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
             mLastLoaderId = savedInstanceState.getInt(INSTANCE_STATE_LAST_LOADER_ID);
             mProgressingLoaderIds = savedInstanceState.getIntegerArrayList(INSTANCE_STATE_PROGRESSING_LOADER_IDS);
             mMultiInputArgs = savedInstanceState.getParcelableArrayList(INSTANCE_STATE_MULTI_INPUT_ARGS);
-            mQueryText = savedInstanceState.getString(INSTANCE_STATE_QUERY_TEXT);
+            mQueryText.set(savedInstanceState.getString(INSTANCE_STATE_QUERY_TEXT));
             mSearchedTitles = savedInstanceState.getStringArrayList(INSTANCE_STATE_SEARCHED_TITLES);
         } else {
             mProgressingItemIdBundle = new Bundle();
@@ -105,15 +102,12 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
         View view = super.onCreateView(inflater, container, savedInstanceState);
 
+        mBinding.setReceiveFailedText(getString(R.string.failed_to_receive_frequent_item));
+        mBinding.setNoDataText(getString(R.string.no_frequent_items));
         for (int id : mProgressingLoaderIds) {
             getLoaderManager().initLoader(id, null, this);
         }
         getLoaderManager().initLoader(LOADER_ID_QUERY, null, this);
-        if (!TextUtils.isEmpty(mQueryText)) {
-            mProgressBar.setVisibility(View.GONE);
-            mEmptyText.setText(R.string.no_search_result);
-            mEmptyText.setVisibility(View.VISIBLE);
-        }
         PreferenceManager.getDefaultSharedPreferences(getActivity()).registerOnSharedPreferenceChangeListener(this);
         setSortOrder();
         sectionChanged();
@@ -155,7 +149,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         outState.putInt(INSTANCE_STATE_LAST_LOADER_ID, mLastLoaderId);
         outState.putIntegerArrayList(INSTANCE_STATE_PROGRESSING_LOADER_IDS, mProgressingLoaderIds);
         outState.putParcelableArrayList(INSTANCE_STATE_MULTI_INPUT_ARGS, mMultiInputArgs);
-        outState.putString(INSTANCE_STATE_QUERY_TEXT, mQueryText);
+        outState.putString(INSTANCE_STATE_QUERY_TEXT, mQueryText.get());
         outState.putStringArrayList(INSTANCE_STATE_SEARCHED_TITLES, mSearchedTitles);
     }
 
@@ -226,9 +220,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         SearchView searchView = (SearchView) MenuItemCompat.getActionView(searchMenu);
 
         searchView.setSearchableInfo(searchManager.getSearchableInfo(getActivity().getComponentName()));
-        if (!TextUtils.isEmpty(mQueryText)) {
+        if (!TextUtils.isEmpty(mQueryText.get())) {
             MenuItemCompat.expandActionView(searchMenu);
-            searchView.setQuery(mQueryText, false);
+            searchView.setQuery(mQueryText.get(), false);
         }
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
@@ -238,7 +232,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
             @Override
             public boolean onQueryTextChange(String newText) {
-                mQueryText = newText;
+                mQueryText.set(newText);
                 if (!TextUtils.isEmpty(newText)) {
                     QueryLoader loader = QueryLoader.castLoader(
                             getLoaderManager().restartLoader(LOADER_ID_QUERY, null, FrequentlyInputFragment.this));
@@ -246,13 +240,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                     loader.sectionId = mSectionId;
                     loader.keyword = newText;
                     loader.forceLoad();
-                    mEmptyText.setText(R.string.no_search_result);
-                    mRetryButton.setVisibility(View.GONE);
                 } else {
                     mSearchedTitles = null;
                     sectionChanged();
-                    mEmptyText.setText(mNoDataStringId);
-                    mRetryButton.setVisibility(View.VISIBLE);
                 }
 
                 return false;
@@ -295,18 +285,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     public void onLoadFinished(Loader loader, Object data) {
         switch (loader.getId()) {
             case LOADER_ID_QUERY: {
-                if (!TextUtils.isEmpty(mQueryText)) {
+                if (!TextUtils.isEmpty(mQueryText.get())) {
                     mSearchedTitles = (ArrayList<String>) data;
                     sectionChanged();
-                }
-                break;
-            }
-            case LOADER_ID_REFRESH_MAIN_DATA: {
-                super.onLoadFinished(loader, data);
-                if (!TextUtils.isEmpty(mQueryText)) {
-                    mEmptyText.setText(R.string.no_search_result);
-                    mEmptyText.setVisibility(View.VISIBLE);
-                    mRetryButton.setVisibility(View.GONE);
                 }
                 break;
             }
@@ -332,7 +313,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                                                     usedArgs.getInt(EntriesLoader.ARG_SLOT_NUMBER) +
                                                             ":" + usedArgs.getString(WhooingKeyValues.ITEM_ID));
                                             if (progressingItemIds == mCurrentProgressingItemIds) {
-                                                mRecyclerView.getAdapter().notifyDataSetChanged();
+                                                mBinding.recyclerView.getAdapter().notifyDataSetChanged();
                                             }
                                         }
                                         mProgressingLoaderIds.add(finalLoader.getId());
@@ -359,7 +340,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                         progressingItemIds.remove(usedArgs.getInt(EntriesLoader.ARG_SLOT_NUMBER) +
                                 ":" + usedArgs.getString(WhooingKeyValues.ITEM_ID));
                         if (progressingItemIds == mCurrentProgressingItemIds) {
-                            mRecyclerView.getAdapter().notifyDataSetChanged();
+                            mBinding.recyclerView.getAdapter().notifyDataSetChanged();
                         }
                     }
                 } else {
@@ -461,7 +442,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     private void inputEntry(Bundle args) {
         mCurrentProgressingItemIds.add(args.getInt(EntriesLoader.ARG_SLOT_NUMBER) + ":" +
                 args.getString(WhooingKeyValues.ITEM_ID));
-        mRecyclerView.getAdapter().notifyDataSetChanged();
+        mBinding.recyclerView.getAdapter().notifyDataSetChanged();
         synchronized (this) {
             mProgressingLoaderIds.add(mLastLoaderId);
             getLoaderManager().initLoader(mLastLoaderId,
