@@ -24,7 +24,7 @@
             android:id="@+id/fragment"
             android:name="com.younggeon.whoolite.fragment.FrequentlyInputItemDetailActivityFragment"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             tools:layout="@layout/fragment_frequently_input_item_detail" />
     </ScrollView>
 

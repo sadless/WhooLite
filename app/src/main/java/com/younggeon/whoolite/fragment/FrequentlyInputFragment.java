@@ -788,6 +788,12 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
                 if (SoundSearcher.matchString(trimmedTitle, keyword)) {
                     retVal.add(originalTitle);
+                } else if (!TextUtils.isEmpty(item.getSearchKeyword())){
+                    String searchKeyword = item.getSearchKeyword().replaceAll("\\s", "");
+
+                    if (SoundSearcher.matchString(searchKeyword, keyword)) {
+                        retVal.add(originalTitle);
+                    }
                 }
             }
             realm.close();

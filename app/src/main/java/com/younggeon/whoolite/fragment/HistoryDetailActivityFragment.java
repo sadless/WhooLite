@@ -79,9 +79,21 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                 mRightAccountId = entry.getRightAccountId();
             }
             realm.close();
+            getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
         } else {
-            getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+            Intent intent = getActivity().getIntent();
+
             mEntryDate = Integer.parseInt(mEntryDateFormat.format(new Date()));
+            if (intent.getBooleanExtra(HistoryDetailActivity.EXTRA_COPY, false)) {
+                mTitle.setText(intent.getStringExtra(HistoryDetailActivity.EXTRA_TITLE));
+                mMoney.setText(intent.getStringExtra(HistoryDetailActivity.EXTRA_MONEY));
+                mLeftAccountType = intent.getStringExtra(HistoryDetailActivity.EXTRA_LEFT_ACCOUNT_TYPE);
+                mLeftAccountId = intent.getStringExtra(HistoryDetailActivity.EXTRA_LEFT_ACCOUNT_ID);
+                mRightAccountType = intent.getStringExtra(HistoryDetailActivity.EXTRA_RIGHT_ACCOUNT_TYPE);
+                mRightAccountId = intent.getStringExtra(HistoryDetailActivity.EXTRA_RIGHT_ACCOUNT_ID);
+                mMemo.setText(intent.getStringExtra(HistoryDetailActivity.EXTRA_MEMO));
+                getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
+            }
         }
     }
 
@@ -153,7 +165,6 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
         if (mEntryId >= 0) {
             getLoaderManager().initLoader(LOADER_ID_EDIT_SEND, null, this);
             getLoaderManager().initLoader(LOADER_ID_DELETE, null, this);
-            getActivity().getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
         } else {
             getLoaderManager().initLoader(LOADER_ID_SEND, null, this);
         }
@@ -258,6 +269,23 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                             }
                         }).setNegativeButton(R.string.cancel, null)
                         .create().show();
+
+                return true;
+            }
+            case R.id.action_copy: {
+                Intent intent = new Intent(getActivity(), HistoryDetailActivity.class);
+
+                intent.putExtra(HistoryDetailActivity.EXTRA_SECTION_ID, mSectionId);
+                intent.putExtra(HistoryDetailActivity.EXTRA_COPY, true);
+                intent.putExtra(HistoryDetailActivity.EXTRA_TITLE, mTitle.getText().toString());
+                intent.putExtra(HistoryDetailActivity.EXTRA_MONEY, mMoney.getText().toString());
+                intent.putExtra(HistoryDetailActivity.EXTRA_LEFT_ACCOUNT_TYPE, mLeftAccountType);
+                intent.putExtra(HistoryDetailActivity.EXTRA_LEFT_ACCOUNT_ID, mLeftAccountId);
+                intent.putExtra(HistoryDetailActivity.EXTRA_RIGHT_ACCOUNT_TYPE, mRightAccountType);
+                intent.putExtra(HistoryDetailActivity.EXTRA_RIGHT_ACCOUNT_ID, mRightAccountId);
+                intent.putExtra(HistoryDetailActivity.EXTRA_MEMO, mMemo.getText().toString());
+                startActivity(intent);
+                getActivity().finish();
 
                 return true;
             }

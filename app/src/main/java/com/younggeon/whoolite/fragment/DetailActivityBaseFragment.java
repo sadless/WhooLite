@@ -3,7 +3,6 @@ package com.younggeon.whoolite.fragment;
 import android.app.ProgressDialog;
 import android.databinding.DataBindingUtil;
 import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -51,6 +50,7 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
     protected Spinner mRight;
     protected ProgressDialog mProgress;
     protected EditText mMemo;
+    protected EditText mSearchKeyword;
 
     protected String mSectionId;
     protected String mLeftAccountType;
@@ -94,6 +94,7 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         mRight.setTag(AccountsAdapter.DIRECTION_RIGHT);
         mRight.setOnItemSelectedListener(mListener);
         mMemo = (EditText) view.findViewById(R.id.memo);
+        mSearchKeyword = (EditText) view.findViewById(R.id.search_keyword);
         mSectionId = PreferenceManager.getDefaultSharedPreferences(getActivity())
                 .getString(PreferenceKeys.CURRENT_SECTION_ID, null);
         if (savedInstanceState == null) {
@@ -233,8 +234,6 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         public AccountsAdapter(int direction) {
             this.mDirection = direction;
             refresh();
-//            mItemPadding = getResources().getDimensionPixelSize(R.dimen.account_item_padding);
-//            mTypePadding = getResources().getDimensionPixelSize(R.dimen.account_type_padding);
         }
 
         @Override
@@ -602,18 +601,6 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
             }
 
             return title;
-        }
-
-        private class ViewHolder {
-            public TextView main;
-            public TextView sub;
-            public Drawable background;
-
-            public ViewHolder(TextView main, TextView sub, Drawable background) {
-                this.main = main;
-                this.sub = sub;
-                this.background = background;
-            }
         }
     }
 }

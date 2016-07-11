@@ -73,6 +73,7 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
             return;
         }
         mBinding = DataBindingUtil.setContentView(this, R.layout.activity_whoo_lite);
+        mBinding.setActivity(this);
         setSupportActionBar(mBinding.toolbar);
 
         ActionBar ab = getSupportActionBar();

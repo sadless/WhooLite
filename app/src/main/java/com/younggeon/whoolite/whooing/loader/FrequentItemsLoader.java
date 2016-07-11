@@ -38,9 +38,11 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
     public static final String ARG_OLD_SLOT = "old_slot";
     public static final String ARG_NEW_SLOT = "new_slot";
+    public static final String ARG_SEARCH_KEYWORD = "search_keyword";
 
     private int mUseCount;
     private long mLastUseTime;
+    private String mSearchKeyword;
 
     public FrequentItemsLoader(Context context, int method, Bundle args) {
         super(context, method, args);
@@ -180,10 +182,12 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                 String itemId = args.getString(WhooingKeyValues.ITEM_ID);
                 Uri.Builder builder = Uri.parse(URI_FREQUENT_ITEMS).buildUpon();
                 int resultCode;
+                String searchKeyword = args.getString(ARG_SEARCH_KEYWORD);
 
                 args.remove(ARG_OLD_SLOT);
                 args.remove(ARG_NEW_SLOT);
                 args.remove(WhooingKeyValues.ITEM_ID);
+                args.remove(ARG_SEARCH_KEYWORD);
                 if (oldSlot == newSlot) {
                     builder.appendPath("slot" + newSlot)
                             .appendPath(itemId + ".json");
@@ -209,6 +213,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
                             realm.beginTransaction();
                             setFrequentItemFromJson(frequentItem, resultItem);
+                            frequentItem.setSearchKeyword(searchKeyword);
                             realm.commitTransaction();
                             realm.close();
                         }
@@ -228,6 +233,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                 args.putInt(ARG_OLD_SLOT, oldSlot);
                 args.putInt(ARG_NEW_SLOT, newSlot);
                 args.putString(WhooingKeyValues.ITEM_ID, itemId);
+                args.putString(ARG_SEARCH_KEYWORD, searchKeyword);
 
                 return resultCode;
             }
@@ -263,8 +269,14 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                             for (int i = 0; i < itemsInSlot.length(); i++, sortOrder++) {
                                 JSONObject frequentItem = itemsInSlot.optJSONObject(i);
                                 FrequentItem object = createFrequentItemObjectFromJson(frequentItem, sectionId, slotNumber, i);
+                                FrequentItem oldObject = realm.where(FrequentItem.class).equalTo("primaryKey", object.getPrimaryKey()).findFirst();
 
                                 query.notEqualTo("primaryKey", object.getPrimaryKey());
+                                if (oldObject != null) {
+                                    object.setUseCount(oldObject.getUseCount());
+                                    object.setLastUseTime(oldObject.getLastUseTime());
+                                    object.setSearchKeyword(oldObject.getSearchKeyword());
+                                }
                                 objects.add(object);
                             }
                             slotNumber++;
@@ -311,9 +323,11 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
             if (frequentItem != null) {
                 mUseCount = frequentItem.getUseCount();
                 mLastUseTime = frequentItem.getLastUseTime();
+                mSearchKeyword = frequentItem.getSearchKeyword();
             } else {
                 mUseCount = 0;
                 mLastUseTime = 0;
+                mSearchKeyword = null;
             }
         }
         builder.appendPath("slot" + slotNumber)
@@ -385,6 +399,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                     if (mMethod == Request.Method.PUT) {
                         frequentItem.setUseCount(mUseCount);
                         frequentItem.setLastUseTime(mLastUseTime);
+                        frequentItem.setSearchKeyword(mSearchKeyword);
                     }
                     realm.beginTransaction();
                     realm.copyToRealmOrUpdate(frequentItem);

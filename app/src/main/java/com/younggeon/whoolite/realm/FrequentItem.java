@@ -23,6 +23,7 @@ public class FrequentItem extends RealmObject {
     private int useCount = 0;
     private long lastUseTime = 0;
     private int sortOrder;
+    private String searchKeyword;
 
     public String getPrimaryKey() {
         return primaryKey;
@@ -130,5 +131,13 @@ public class FrequentItem extends RealmObject {
 
     public void composePrimaryKey() {
         primaryKey = sectionId + "|" + slotNumber + "|" + itemId;
+    }
+
+    public String getSearchKeyword() {
+        return searchKeyword;
+    }
+
+    public void setSearchKeyword(String searchKeyword) {
+        this.searchKeyword = searchKeyword;
     }
 }

@@ -76,6 +76,7 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
                     default:
                 }
             }
+            mSearchKeyword.setText(frequentItem.getSearchKeyword());
         }
         realm.close();
     }
@@ -145,6 +146,7 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
                 mSlotNumber.setAdapter(adapter);
                 mSlotNumber.setSelection(mOldSlotNumber - 1);
                 mMemo.setVisibility(View.GONE);
+
                 break;
             }
             case FrequentlyInputItemDetailActivity.MODE_COMPLETE: {
@@ -189,6 +191,7 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
 
                     args.putInt(FrequentItemsLoader.ARG_OLD_SLOT, mOldSlotNumber);
                     args.putInt(FrequentItemsLoader.ARG_NEW_SLOT, mSlotNumber.getSelectedItemPosition() + 1);
+                    args.putString(FrequentItemsLoader.ARG_SEARCH_KEYWORD, mSearchKeyword.getText().toString());
                     args.putString(WhooingKeyValues.ITEM_ID, mItemId);
                     args.putString(WhooingKeyValues.SECTION_ID, mSectionId);
                     args.putString(WhooingKeyValues.ITEM_TITLE, mTitle.getText().toString());

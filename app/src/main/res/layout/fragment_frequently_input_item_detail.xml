@@ -13,4 +13,16 @@
         android:layout_height="wrap_content" />
 
     <include layout="@layout/fragment_detail_base"/>
+    <android.support.design.widget.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <EditText
+            android:id="@+id/search_keyword"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/search_keyword"
+            android:imeOptions="actionNext"
+            android:inputType="text" />
+    </android.support.design.widget.TextInputLayout>
 </LinearLayout>
