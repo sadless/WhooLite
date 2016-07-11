@@ -4,6 +4,9 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.databinding.DataBindingUtil;
+import android.databinding.ObservableBoolean;
+import android.databinding.ObservableField;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -18,8 +21,6 @@ import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 
 import com.android.volley.Request;
 import com.android.volley.toolbox.JsonObjectRequest;
@@ -29,6 +30,7 @@ import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.WhooLiteNetwork;
 import com.younggeon.whoolite.activity.WhooingLoginActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
+import com.younggeon.whoolite.databinding.FragmentWhooingLoginBinding;
 
 import org.json.JSONObject;
 
@@ -47,31 +49,43 @@ public class WhooingLoginActivityFragment extends Fragment implements LoaderMana
 
     private static final String URI_AUTHORIZE = "https://whooing.com/app_auth/authorize";
 
+    private static final String INSTANCE_STATE_TOKEN = "token";
+    private static final String INSTANCE_STATE_FAILED = "failed";
+    private static final String INSTANCE_STATE_PIN = "pin";
+
     private static WebView sLoginWebView;
     private static ViewGroup sOldRootView;
 
-    private ProgressBar mProgress;
-    private LinearLayout mFailedLayout;
-
-    private String mToken;
+    private ObservableField<String> mToken;
+    private ObservableBoolean mFailed;
+    private ObservableField<String> mPin;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Nullable
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_whooing_login, container, false);
-        View webView = view.findViewById(R.id.login_webview);
+        FragmentWhooingLoginBinding binding = DataBindingUtil.bind(inflater.inflate(R.layout.fragment_whooing_login, container, false));
 
         if (savedInstanceState == null) {
-            sLoginWebView = (WebView)webView;
+            sLoginWebView = binding.loginWebView;
             sLoginWebView.getSettings().setJavaScriptEnabled(true);
+            mToken = new ObservableField<>(null);
+            mFailed = new ObservableBoolean(false);
+            mPin = new ObservableField<>(null);
         } else {
-            ViewGroup rootView = (ViewGroup)view;
+            ViewGroup rootView = (ViewGroup)binding.getRoot();
 
-            rootView.removeView(webView);
+            rootView.removeView(binding.loginWebView);
             sOldRootView.removeView(sLoginWebView);
             rootView.addView(sLoginWebView, 0);
+            mToken = new ObservableField<>(savedInstanceState.getString(INSTANCE_STATE_TOKEN));
+            mFailed = new ObservableBoolean(savedInstanceState.getBoolean(INSTANCE_STATE_FAILED));
+            mPin = new ObservableField<>(savedInstanceState.getString(INSTANCE_STATE_PIN));
         }
+        binding.setFragment(this);
+        binding.setToken(mToken);
+        binding.setFailed(mFailed);
+        binding.setPin(mPin);
         sLoginWebView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -79,15 +93,14 @@ public class WhooingLoginActivityFragment extends Fragment implements LoaderMana
                 String pin;
 
                 if ((pin = uri.getQueryParameter(WhooingKeyValues.PIN)) != null) {
-                    sLoginWebView.setVisibility(View.GONE);
-                    mProgress.setVisibility(View.VISIBLE);
+                    mPin.set(pin);
 
                     RequestAccessTokenLoader requestAccessTokenLoader
                             = RequestAccessTokenLoader.castLoader(
                                 getLoaderManager()
                                         .initLoader(LOADER_ID_REQUEST_ACCESS_TOKEN, null, WhooingLoginActivityFragment.this));
 
-                    requestAccessTokenLoader.token = mToken;
+                    requestAccessTokenLoader.token = mToken.get();
                     requestAccessTokenLoader.pin = pin;
                     requestAccessTokenLoader.forceLoad();
 
@@ -102,37 +115,27 @@ public class WhooingLoginActivityFragment extends Fragment implements LoaderMana
         } else {
             CookieManager.getInstance().removeAllCookie();
         }
-        mProgress = (ProgressBar)view.findViewById(R.id.progress);
-        mFailedLayout = (LinearLayout)view.findViewById(R.id.failed_layout);
-        view.findViewById(R.id.retry).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                mProgress.setVisibility(View.VISIBLE);
-                mFailedLayout.setVisibility(View.GONE);
-
-                Loader requestTokenLoader = getLoaderManager().getLoader(LOADER_ID_REQUEST_TOKEN);
-
-                if (requestTokenLoader != null) {
-                    getLoaderManager().initLoader(LOADER_ID_REQUEST_ACCESS_TOKEN, null, WhooingLoginActivityFragment.this).forceLoad();
-                } else {
-                    getLoaderManager().initLoader(LOADER_ID_REQUEST_TOKEN, null, WhooingLoginActivityFragment.this).forceLoad();
-                }
-            }
-        });
         if (getLoaderManager().getLoader(LOADER_ID_REQUEST_ACCESS_TOKEN) == null) {
             Loader requestTokenLoader = getLoaderManager().initLoader(LOADER_ID_REQUEST_TOKEN, null, this);
 
             if (!requestTokenLoader.isStarted()) {
                 requestTokenLoader.forceLoad();
-            } else {
-                mProgress.setVisibility(View.GONE);
             }
         } else {
             getLoaderManager().initLoader(LOADER_ID_REQUEST_ACCESS_TOKEN, null, this);
         }
-        sOldRootView = (ViewGroup)view;
+        sOldRootView = (ViewGroup)binding.getRoot();
 
-        return view;
+        return binding.getRoot();
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+
+        outState.putString(INSTANCE_STATE_TOKEN, mToken.get());
+        outState.putBoolean(INSTANCE_STATE_FAILED, mFailed.get());
+        outState.putString(INSTANCE_STATE_PIN, mPin.get());
     }
 
     @Override
@@ -152,17 +155,18 @@ public class WhooingLoginActivityFragment extends Fragment implements LoaderMana
 
     @Override
     public void onLoadFinished(Loader<JSONObject> loader, JSONObject data) {
-        mProgress.setVisibility(View.GONE);
         switch (loader.getId()) {
             case LOADER_ID_REQUEST_TOKEN: {
                 if (data == null) {
-                    mFailedLayout.setVisibility(View.VISIBLE);
+                    mFailed.set(true);
                     getLoaderManager().destroyLoader(LOADER_ID_REQUEST_TOKEN);
                 } else if (sLoginWebView.getUrl() == null) {
-                    mToken = data.optString(WhooingKeyValues.TOKEN);
+                    String token = data.optString(WhooingKeyValues.TOKEN);
+
+                    mToken.set(token);
 
                     Uri uri = Uri.parse(URI_AUTHORIZE).buildUpon()
-                            .appendQueryParameter(WhooingKeyValues.TOKEN, mToken).build();
+                            .appendQueryParameter(WhooingKeyValues.TOKEN, token).build();
 
                     sLoginWebView.loadUrl(uri.toString());
                 }
@@ -170,7 +174,7 @@ public class WhooingLoginActivityFragment extends Fragment implements LoaderMana
             }
             case LOADER_ID_REQUEST_ACCESS_TOKEN: {
                 if (data == null) {
-                    mFailedLayout.setVisibility(View.VISIBLE);
+                    mFailed.set(true);
                     getLoaderManager().destroyLoader(LOADER_ID_REQUEST_ACCESS_TOKEN);
                 } else {
                     Intent intent = new Intent();
@@ -203,6 +207,18 @@ public class WhooingLoginActivityFragment extends Fragment implements LoaderMana
         }
 
         return retVal;
+    }
+
+    public void retryClicked() {
+        mFailed.set(false);
+
+        Loader requestTokenLoader = getLoaderManager().getLoader(LOADER_ID_REQUEST_TOKEN);
+
+        if (requestTokenLoader != null) {
+            getLoaderManager().initLoader(LOADER_ID_REQUEST_ACCESS_TOKEN, null, WhooingLoginActivityFragment.this).forceLoad();
+        } else {
+            getLoaderManager().initLoader(LOADER_ID_REQUEST_TOKEN, null, WhooingLoginActivityFragment.this).forceLoad();
+        }
     }
 
     private String sha1(String str) {

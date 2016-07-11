@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+    <data>
+        <import type="android.text.TextUtils" />
+        <import type="android.view.View" />
+        <variable
+            name="selectable"
+            type="boolean" />
+        <variable
+            name="title"
+            type="String" />
+        <variable
+            name="memo"
+            type="String" />
+        <variable
+            name="defaultBackground"
+            type="android.graphics.drawable.Drawable" />
+        <variable
+            name="colorBackground"
+            type="android.graphics.drawable.Drawable" />
+    </data>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="@{selectable ? @dimen/account_item_padding : @dimen/account_type_padding}"
+        android:orientation="vertical"
+        android:background="@{selectable ? defaultBackground : colorBackground}">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceListItem"
+            android:text="@{title}"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceListItemSmall"
+            android:textColor="#a0a0a0"
+            android:text="@{memo}"
+            android:visibility="@{TextUtils.isEmpty(memo) ? View.GONE : View.VISIBLE}"/>
+    </LinearLayout>
+</layout>

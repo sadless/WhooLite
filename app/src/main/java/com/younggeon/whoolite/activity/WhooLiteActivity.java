@@ -4,10 +4,10 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.databinding.DataBindingUtil;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.support.design.widget.TabLayout;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.ActivityOptionsCompat;
 import android.support.v4.app.Fragment;
@@ -15,11 +15,8 @@ import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.Loader;
-import android.support.v4.view.ViewPager;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.Toolbar;
-import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -27,15 +24,15 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.android.volley.Request;
-import com.google.android.gms.ads.AdView;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.constant.Actions;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
+import com.younggeon.whoolite.databinding.ActivityWhooLiteBinding;
+import com.younggeon.whoolite.databinding.SpinnerItemSectionBinding;
 import com.younggeon.whoolite.db.schema.FrequentItems;
 import com.younggeon.whoolite.db.schema.Sections;
 import com.younggeon.whoolite.fragment.FrequentlyInputFragment;
@@ -56,7 +53,7 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
     private static final int LOADER_ID_REFRESH_SECTIONS = 1;
     private static final int LOADER_ID_REFRESH_ACCOUNTS = 2;
 
-    private Spinner mSectionsSpinner;
+    private ActivityWhooLiteBinding mBinding;
 
     private String mCurrentSectionId;
     private Realm mRealm;
@@ -75,16 +72,15 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
 
             return;
         }
-        setContentView(R.layout.activity_whoo_lite);
-        setSupportActionBar((Toolbar) findViewById(R.id.toolbar));
+        mBinding = DataBindingUtil.setContentView(this, R.layout.activity_whoo_lite);
+        setSupportActionBar(mBinding.toolbar);
 
         ActionBar ab = getSupportActionBar();
 
         if (ab != null) {
             ab.setDisplayShowTitleEnabled(false);
         }
-        mSectionsSpinner = (Spinner)findViewById(R.id.sections);
-        mSectionsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+        mBinding.sectionsSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 Section section = mSections.get(position);
@@ -108,30 +104,6 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
 
             }
         });
-
-        View writeButton = findViewById(R.id.write);
-
-        if (writeButton != null) {
-            writeButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (mCurrentSectionId != null) {
-                        Intent intent = new Intent(WhooLiteActivity.this,
-                                HistoryDetailActivity.class);
-
-                        intent.putExtra(HistoryDetailActivity.EXTRA_SECTION_ID, mCurrentSectionId);
-                        ActivityCompat.startActivity(WhooLiteActivity.this,
-                                intent,
-                                ActivityOptionsCompat.makeScaleUpAnimation(v,
-                                        0,
-                                        0,
-                                        v.getWidth(),
-                                        v.getHeight()
-                                ).toBundle());
-                    }
-                }
-            });
-        }
         mRealm = Realm.getDefaultInstance();
         mSections = mRealm.where(Section.class).findAllSortedAsync("sortOrder", Sort.ASCENDING);
         mSections.addChangeListener(new RealmChangeListener<RealmResults<Section>>() {
@@ -141,18 +113,12 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
             }
         });
 
-        TabLayout tabLayout = (TabLayout) findViewById(R.id.tab);
-        ViewPager pager = (ViewPager) findViewById(R.id.pager);
         WhooLitePagerAdapter adapter = new WhooLitePagerAdapter(getSupportFragmentManager());
 
-        if (pager != null) {
-            pager.setAdapter(adapter);
-            pager.setOffscreenPageLimit(adapter.getCount());
-        }
-        if (tabLayout != null) {
-            tabLayout.setupWithViewPager(pager);
-        }
-        Utility.setAdView(mAdView = (AdView) findViewById(R.id.adview));
+        mBinding.viewPager.setAdapter(adapter);
+        mBinding.viewPager.setOffscreenPageLimit(adapter.getCount());
+        mBinding.tabLayout.setupWithViewPager(mBinding.viewPager);
+        Utility.setAdView(mAdView = mBinding.adView);
         if (!prefs.getBoolean(PreferenceKeys.MIGRATE_TO_REALM, false)) {
             new AsyncTask<Void, Void, Void>() {
                 @Override
@@ -339,10 +305,10 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
 
     private void sectionChanged() {
         if (mSections.size() > 0) {
-            SectionsAdapter adapter = (SectionsAdapter)mSectionsSpinner.getAdapter();
+            SectionsAdapter adapter = (SectionsAdapter)mBinding.sectionsSpinner.getAdapter();
 
             if (adapter == null) {
-                mSectionsSpinner.setAdapter(new SectionsAdapter());
+                mBinding.sectionsSpinner.setAdapter(new SectionsAdapter());
             } else {
                 adapter.notifyDataSetChanged();
             }
@@ -360,7 +326,24 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
                 }
                 position++;
             }
-            mSectionsSpinner.setSelection(position);
+            mBinding.sectionsSpinner.setSelection(position);
+        }
+    }
+
+    public void writeClicked(View v) {
+        if (mCurrentSectionId != null) {
+            Intent intent = new Intent(WhooLiteActivity.this,
+                    HistoryDetailActivity.class);
+
+            intent.putExtra(HistoryDetailActivity.EXTRA_SECTION_ID, mCurrentSectionId);
+            ActivityCompat.startActivity(WhooLiteActivity.this,
+                    intent,
+                    ActivityOptionsCompat.makeScaleUpAnimation(v,
+                            0,
+                            0,
+                            v.getWidth(),
+                            v.getHeight()
+                    ).toBundle());
         }
     }
 
@@ -401,37 +384,22 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
         @Override
         public View getDropDownView(int position, View convertView, ViewGroup parent) {
             if (convertView == null) {
-                convertView = LayoutInflater.from(parent.getContext()).inflate(R.layout.spinner_item_with_memo,
+                SpinnerItemSectionBinding binding = DataBindingUtil.bind(LayoutInflater.from(parent.getContext()).inflate(R.layout.spinner_item_section,
                         parent,
-                        false);
-                convertView.setTag(new ViewHolder((TextView)convertView.findViewById(R.id.text1),
-                        (TextView)convertView.findViewById(R.id.text2)));
+                        false));
+
+                convertView = binding.getRoot();
+                convertView.setTag(binding);
             }
 
-            ViewHolder vh = (ViewHolder)convertView.getTag();
+            SpinnerItemSectionBinding binding = (SpinnerItemSectionBinding) convertView.getTag();
             Section section = getItem(position);
-            String memo = section.getMemo();
 
-            vh.main.setText(getString(R.string.section_title_format, section.getTitle(),
-                    section.getCurrency()));
-            if (TextUtils.isEmpty(memo)) {
-                vh.sub.setVisibility(View.GONE);
-            } else {
-                vh.sub.setText(memo);
-                vh.sub.setVisibility(View.VISIBLE);
-            }
+            binding.setTitle(section.getTitle());
+            binding.setCurrency(section.getCurrency());
+            binding.setMemo(section.getMemo());
 
             return convertView;
-        }
-
-        private class ViewHolder {
-            public TextView main;
-            public TextView sub;
-
-            public ViewHolder(TextView main, TextView sub) {
-                this.main = main;
-                this.sub = sub;
-            }
         }
     }
 

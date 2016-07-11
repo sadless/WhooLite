@@ -5,12 +5,15 @@ android {
     compileSdkVersion 23
     buildToolsVersion "23.0.3"
 
+    dataBinding {
+        enabled = true
+    }
     defaultConfig {
         applicationId "com.younggeon.whoolite"
         minSdkVersion 10
         targetSdkVersion 23
-        versionCode 1607041
-        versionName "160704"
+        versionCode 1607110
+        versionName "160711"
     }
     buildTypes {
         release {
