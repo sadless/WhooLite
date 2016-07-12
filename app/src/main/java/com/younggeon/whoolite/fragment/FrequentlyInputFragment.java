@@ -87,12 +87,14 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+        String queryText = null;
+
         if (savedInstanceState != null) {
             mProgressingItemIdBundle = savedInstanceState.getBundle(INSTANCE_STATE_PROGRESSING_ITEM_ID_BUNDLE);
             mLastLoaderId = savedInstanceState.getInt(INSTANCE_STATE_LAST_LOADER_ID);
             mProgressingLoaderIds = savedInstanceState.getIntegerArrayList(INSTANCE_STATE_PROGRESSING_LOADER_IDS);
             mMultiInputArgs = savedInstanceState.getParcelableArrayList(INSTANCE_STATE_MULTI_INPUT_ARGS);
-            mQueryText.set(savedInstanceState.getString(INSTANCE_STATE_QUERY_TEXT));
+            queryText = savedInstanceState.getString(INSTANCE_STATE_QUERY_TEXT);
             mSearchedTitles = savedInstanceState.getStringArrayList(INSTANCE_STATE_SEARCHED_TITLES);
         } else {
             mProgressingItemIdBundle = new Bundle();
@@ -102,6 +104,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
         View view = super.onCreateView(inflater, container, savedInstanceState);
 
+        mQueryText.set(queryText);
         mBinding.setReceiveFailedText(getString(R.string.failed_to_receive_frequent_item));
         mBinding.setNoDataText(getString(R.string.no_frequent_items));
         for (int id : mProgressingLoaderIds) {
