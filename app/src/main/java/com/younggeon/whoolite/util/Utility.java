@@ -38,7 +38,8 @@ public class Utility {
                             public void onClick(DialogInterface dialog, int which) {
                                 logout(context);
                             }
-                        }).create().show();
+                        }).setCancelable(false)
+                        .create().show();
                 return false;
             }
             default: {
