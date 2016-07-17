@@ -38,6 +38,8 @@ import com.younggeon.whoolite.db.schema.Sections;
 import com.younggeon.whoolite.fragment.FrequentlyInputFragment;
 import com.younggeon.whoolite.fragment.HistoryFragment;
 import com.younggeon.whoolite.provider.WhooingProvider;
+import com.younggeon.whoolite.realm.Account;
+import com.younggeon.whoolite.realm.Entry;
 import com.younggeon.whoolite.realm.FrequentItem;
 import com.younggeon.whoolite.realm.Section;
 import com.younggeon.whoolite.util.Utility;
@@ -326,6 +328,14 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
                     break;
                 }
                 position++;
+            }
+            if (position == mSections.size()) {
+                mRealm.beginTransaction();
+                mRealm.where(Account.class).equalTo("sectionId", currentSectionId).findAll().deleteAllFromRealm();
+                mRealm.where(FrequentItem.class).equalTo("sectionId", currentSectionId).findAll().deleteAllFromRealm();
+                mRealm.where(Entry.class).equalTo("sectionId", currentSectionId).findAll().deleteAllFromRealm();
+                mRealm.commitTransaction();
+                position = 0;
             }
             mBinding.sectionsSpinner.setSelection(position);
         }

@@ -41,7 +41,7 @@
             android:name=".activity.WhooingLoginActivity"
             android:parentActivityName=".activity.WelcomeActivity"
             android:theme="@style/AppTheme">
-            meta-data
+            <meta-data
             android:name="android.support.PARENT_ACTIVITY"
             android:value="com.younggeon.whoolite.activity.WelcomeActivity" />
         </activity>
