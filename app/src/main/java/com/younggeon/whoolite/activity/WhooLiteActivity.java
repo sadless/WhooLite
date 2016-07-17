@@ -261,10 +261,7 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
                 int resultCode = (Integer) data;
 
                 if (resultCode < 0) {
-                    Realm realm = Realm.getDefaultInstance();
-                    RealmResults<Section> sections = realm.where(Section.class).findAll();
-
-                    if (sections.size() == 0) {
+                    if (mSections.size() == 0) {
                         new AlertDialog.Builder(WhooLiteActivity.this)
                                 .setTitle(R.string.no_sections)
                                 .setMessage(R.string.no_sections_message)
@@ -279,7 +276,6 @@ public class WhooLiteActivity extends FinishableActivity implements LoaderManage
                                 }).setCancelable(false)
                                 .create().show();
                     }
-                    realm.close();
                 } else {
                     Utility.checkResultCodeWithAlert(this, resultCode);
                 }
