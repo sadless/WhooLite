@@ -32,8 +32,6 @@ import io.realm.RealmResults;
 public class AccountsLoader extends WhooingBaseLoader {
     private static final String URI_ACCOUNTS = "https://whooing.com/api/accounts";
 
-    private static final String GROUP = "group";
-
     public AccountsLoader(Context context, int method, Bundle args) {
         super(context, method, args);
     }
@@ -80,7 +78,7 @@ public class AccountsLoader extends WhooingBaseLoader {
                                 object.setAccountId(accountItem.optString(WhooingKeyValues.ACCOUNT_ID));
                                 object.setTitle(accountItem.optString(WhooingKeyValues.TITLE));
                                 object.setMemo(accountItem.optString(WhooingKeyValues.MEMO));
-                                object.setGroup(accountItem.optString(WhooingKeyValues.TYPE).equals(GROUP));
+                                object.setGroup(accountItem.optString(WhooingKeyValues.TYPE).equals(WhooingKeyValues.GROUP));
                                 object.setSortOrder(sortOrder);
                                 object.composePrimaryKey();
                                 query.notEqualTo("primaryKey", object.getPrimaryKey());

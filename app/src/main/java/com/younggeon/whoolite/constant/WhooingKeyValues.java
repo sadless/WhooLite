@@ -41,6 +41,7 @@ public class WhooingKeyValues {
     public static final String CAPITAL = "capital";
     public static final String EXPENSES = "expenses";
     public static final String INCOME = "income";
+    public static final String GROUP = "group";
 
     public static final double EPSILON = 0.0001;
 }
