@@ -41,6 +41,7 @@ public class SectionsLoader extends WhooingBaseLoader {
         switch (mMethod) {
             case Request.Method.GET: {
                 SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+                int resultCode;
 
                 if (prefs.getString(PreferenceKeys.CURRENT_SECTION_ID, null) == null) {
                     Uri.Builder builder = Uri.parse(URI_SECTIONS).buildUpon();
@@ -55,14 +56,14 @@ public class SectionsLoader extends WhooingBaseLoader {
                     try {
                         JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
 
-                        if (result.optInt(WhooingKeyValues.CODE) == WhooingKeyValues.SUCCESS) {
+                        if ((resultCode = result.optInt(WhooingKeyValues.CODE)) == WhooingKeyValues.SUCCESS) {
                             JSONObject resultItem = result.optJSONObject(WhooingKeyValues.RESULT);
 
                             prefs.edit()
                                     .putString(PreferenceKeys.CURRENT_SECTION_ID,
                                             resultItem.optString(WhooingKeyValues.SECTION_ID)).apply();
                         } else {
-                            return -1;
+                            return resultCode;
                         }
                     } catch (JSONException | InterruptedException | ExecutionException | TimeoutException e) {
                         e.printStackTrace();
@@ -76,9 +77,6 @@ public class SectionsLoader extends WhooingBaseLoader {
                         mRequestFuture,
                         mRequestFuture,
                         mApiKeyFormat));
-
-                int resultCode;
-
                 try {
                     JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
 
