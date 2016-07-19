@@ -103,9 +103,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
             if (!sectionId.equals(mSectionId)) {
                 setSectionId(intent.getStringExtra(Actions.EXTRA_SECTION_ID));
-                getLoaderManager().restartLoader(LOADER_ID_REFRESH_MAIN_DATA,
-                        null,
-                        WhooLiteActivityBaseFragment.this).forceLoad();
+                refreshMainData();
                 sectionChanged();
             }
         }
@@ -377,9 +375,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
 
     public void retryClicked() {
         mFailed.set(false);
-        getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA,
-                null,
-                this).forceLoad();
+        refreshMainData();
     }
 
     protected void mainDataChanged() {
