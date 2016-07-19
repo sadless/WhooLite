@@ -306,9 +306,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 section.addChangeListener(new RealmChangeListener<RealmModel>() {
                     @Override
                     public void onChange(RealmModel element) {
-                        synchronized (WhooLiteActivityBaseFragment.this) {
-                            sectionReady();
-                        }
+                        sectionReady();
                     }
                 });
                 mSection = section;

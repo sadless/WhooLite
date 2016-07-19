@@ -152,6 +152,7 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
             case FrequentlyInputItemDetailActivity.MODE_COMPLETE: {
                 mSlotNumber.setVisibility(View.GONE);
                 mMemo.setVisibility(View.VISIBLE);
+                mSearchKeyword.setVisibility(View.GONE);
                 break;
             }
             default:
