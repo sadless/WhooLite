@@ -370,7 +370,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         synchronized (this) {
             mSectionReady = true;
             if (mAccountsReady) {
-                mainDataChanged();
+                refreshMainData();
             }
         }
     }
