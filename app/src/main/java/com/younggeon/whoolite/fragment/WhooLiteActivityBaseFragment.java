@@ -142,21 +142,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         mRealm = Realm.getDefaultInstance();
         setSectionId(prefs.getString(PreferenceKeys.CURRENT_SECTION_ID, null));
         getActivity().registerReceiver(mReceiver, new IntentFilter(Actions.SECTION_ID_CHANGED));
-        mAccountQuery = mRealm.where(Account.class).equalTo("sectionId", mSectionId);
-        mAccounts = mAccountQuery.findAll();
-        mAccounts.addChangeListener(new RealmChangeListener<RealmResults<Account>>() {
-            @Override
-            public void onChange(RealmResults<Account> element) {
-                if (WhooLiteActivityBaseFragment.this.isAdded()) {
-                    synchronized (WhooLiteActivityBaseFragment.this) {
-                        mAccountsReady = true;
-                        if (mSectionReady) {
-                            refreshMainData();
-                        }
-                    }
-                }
-            }
-        });
         getLoaderManager().initLoader(LOADER_ID_DELETE_SELECTED_ITEMS, null, this);
 
         return mBinding.getRoot();
@@ -298,6 +283,23 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         if (sectionId != null) {
             mSectionId = sectionId;
             mAccountQuery = mRealm.where(Account.class).equalTo("sectionId", mSectionId);
+            if (mAccounts != null) {
+                mAccounts.removeChangeListeners();
+            }
+            mAccounts = mAccountQuery.findAll();
+            mAccounts.addChangeListener(new RealmChangeListener<RealmResults<Account>>() {
+                @Override
+                public void onChange(RealmResults<Account> element) {
+                    if (WhooLiteActivityBaseFragment.this.isAdded()) {
+                        synchronized (WhooLiteActivityBaseFragment.this) {
+                            mAccountsReady = true;
+                            if (mSectionReady) {
+                                refreshMainData();
+                            }
+                        }
+                    }
+                }
+            });
 
             Section section = Realm.getDefaultInstance().where(Section.class).equalTo("sectionId", sectionId).findFirst();
 
