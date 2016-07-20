@@ -306,11 +306,17 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                 section.addChangeListener(new RealmChangeListener<RealmModel>() {
                     @Override
                     public void onChange(RealmModel element) {
-                        sectionReady();
+                        synchronized (WhooLiteActivityBaseFragment.this) {
+                            synchronized (this) {
+                                mSectionReady = true;
+                                if (mAccountsReady) {
+                                    refreshMainData();
+                                }
+                            }
+                        }
                     }
                 });
                 mSection = section;
-                sectionReady();
             }
             getDataFromSection(section);
         }
@@ -359,15 +365,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     private void refreshMainData() {
         if (mActionMode == null && mSectionId != null && getLoaderManager().getLoader(LOADER_ID_REFRESH_MAIN_DATA) == null) {
             getLoaderManager().initLoader(LOADER_ID_REFRESH_MAIN_DATA, null, this).forceLoad();
-        }
-    }
-
-    private void sectionReady() {
-        synchronized (this) {
-            mSectionReady = true;
-            if (mAccountsReady) {
-                refreshMainData();
-            }
         }
     }
 
