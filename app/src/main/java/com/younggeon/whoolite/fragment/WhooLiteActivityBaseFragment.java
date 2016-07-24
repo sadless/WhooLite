@@ -553,16 +553,6 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                     double money = getMoney(position);
                     String leftAccountType = getLeftAccountType(position);
                     String rightAccountType = getRightAccountType(position);
-                    Account leftAccount = mAccountQuery.findAll().where()
-                            .equalTo("accountType", leftAccountType)
-                            .equalTo("accountId", getLeftAccountId(position))
-                            .findFirst();
-                    Account rightAccount = mAccountQuery.findAll().where()
-                            .equalTo("accountType", rightAccountType)
-                            .equalTo("accountId", getRightAccountId(position))
-                            .findFirst();
-                    String leftAccountTitle = leftAccount == null ? null : leftAccount.getTitle();
-                    String rightAccountTitle = rightAccount == null ? null : rightAccount.getTitle();
 
                     if (mActionMode != null && mSelectedItems.contains(getSelectionId(position))) {
                         vh.icon.setImageResource(R.drawable.ic_check);
@@ -594,6 +584,12 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                     if (TextUtils.isEmpty(leftAccountType)) {
                         vh.left.setText(R.string.not_assigned);
                     } else {
+                        Account leftAccount = mAccountQuery.findAll().where()
+                                .equalTo("accountType", leftAccountType)
+                                .equalTo("accountId", getLeftAccountId(position))
+                                .findFirst();
+                        String leftAccountTitle = leftAccount == null ? null : leftAccount.getTitle();
+
                         if (TextUtils.isEmpty(leftAccountTitle)) {
                             vh.left.setText(R.string.unknown);
                         } else {
@@ -606,6 +602,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                                     leftAccountTitle += "-";
                                     break;
                                 }
+                                default: {
+                                    break;
+                                }
                             }
                             vh.left.setText(leftAccountTitle);
                         }
@@ -613,6 +612,12 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                     if (TextUtils.isEmpty(rightAccountType)) {
                         vh.right.setText(R.string.not_assigned);
                     } else {
+                        Account rightAccount = mAccountQuery.findAll().where()
+                                .equalTo("accountType", rightAccountType)
+                                .equalTo("accountId", getRightAccountId(position))
+                                .findFirst();
+                        String rightAccountTitle = rightAccount == null ? null : rightAccount.getTitle();
+
                         if (TextUtils.isEmpty(rightAccountTitle)) {
                             vh.left.setText(R.string.unknown);
                         } else {
@@ -623,6 +628,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                                 }
                                 case WhooingKeyValues.LIABILITIES:case WhooingKeyValues.CAPITAL: {
                                     rightAccountTitle += "+";
+                                    break;
+                                }
+                                default: {
                                     break;
                                 }
                             }

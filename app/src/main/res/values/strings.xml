@@ -27,7 +27,7 @@
     <string name="no_frequent_items">자주입력 거래들 항목이 없습니다. 거래내역 탭에서 항목을 만들어보세요!</string>
     <string name="failed_to_receive_frequent_item">자주입력 거래들 항목을 가져오지 못했습니다. 네트워크 상태를 확인하시고 다시 시도해주세요.</string>
     <string name="description_input_icon">항목 선택</string>
-    <string name="not_assigned">(지정 안됨)</string>
+    <string name="not_assigned">(지정 안 됨)</string>
     <string name="slot_name">%1$d번 슬롯</string>
     <string name="currency_format">%1$s%2$s</string>
     <string name="description_send">거래 입력</string>
