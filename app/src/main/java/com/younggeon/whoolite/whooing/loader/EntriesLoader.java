@@ -58,28 +58,28 @@ public class EntriesLoader extends WhooingBaseLoader {
                         args));
                 try {
                     JSONObject result = new JSONObject(mRequestFuture.get(10, TimeUnit.SECONDS));
-                    Realm realm = Realm.getDefaultInstance();
 
-                    realm.beginTransaction();
-                    if (slotNumber > 0) {
-                        FrequentItem frequentItem = realm.where(FrequentItem.class)
-                                .equalTo("sectionId", sectionId)
-                                .equalTo("slotNumber", slotNumber)
-                                .equalTo("itemId", frequentItemId).findFirst();
-
-                        if (frequentItem != null) {
-                            frequentItem.setUseCount(frequentItem.getUseCount() + 1);
-                            frequentItem.setLastUseTime((new Date()).getTime());
-                        }
-                    }
                     resultCode = result.optInt(WhooingKeyValues.CODE);
                     if (resultCode == WhooingKeyValues.SUCCESS) {
                         JSONObject resultItem = result.optJSONArray(WhooingKeyValues.RESULT).optJSONObject(0);
+                        Realm realm = Realm.getDefaultInstance();
 
+                        realm.beginTransaction();
+                        if (slotNumber > 0) {
+                            FrequentItem frequentItem = realm.where(FrequentItem.class)
+                                    .equalTo("sectionId", sectionId)
+                                    .equalTo("slotNumber", slotNumber)
+                                    .equalTo("itemId", frequentItemId).findFirst();
+
+                            if (frequentItem != null) {
+                                frequentItem.setUseCount(frequentItem.getUseCount() + 1);
+                                frequentItem.setLastUseTime((new Date()).getTime());
+                            }
+                        }
                         realm.copyToRealmOrUpdate(createEntryObjectFromJson(resultItem, sectionId));
+                        realm.commitTransaction();
+                        realm.close();
                     }
-                    realm.commitTransaction();
-                    realm.close();
                 } catch (InterruptedException | ExecutionException | TimeoutException | JSONException e) {
                     e.printStackTrace();
 
