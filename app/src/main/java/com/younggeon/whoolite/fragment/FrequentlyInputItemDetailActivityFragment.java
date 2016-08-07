@@ -43,6 +43,7 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
 
     private int mMode;
     private int mOldSlotNumber;
+    private String mItemId;
 
     private Spinner mSlotNumber;
 

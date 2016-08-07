@@ -57,7 +57,6 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
     protected String mLeftAccountId;
     protected String mRightAccountType;
     protected String mRightAccountId;
-    protected String mItemId;
     protected int mLayoutId;
 
     private Realm mRealm;
