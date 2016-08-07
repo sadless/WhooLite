@@ -18,6 +18,7 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
+import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.Toast;
 
@@ -46,6 +47,7 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
     private String mItemId;
 
     private Spinner mSlotNumber;
+    private EditText mSearchKeyword;
 
     @Override
     protected void initialize() {
@@ -131,6 +133,7 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
 
         if (view != null) {
             mSlotNumber = (Spinner) view.findViewById(R.id.slot_number);
+            mSearchKeyword = (EditText) view.findViewById(R.id.search_keyword);
         }
         switch (mMode) {
             case FrequentlyInputItemDetailActivity.MODE_EDIT: {

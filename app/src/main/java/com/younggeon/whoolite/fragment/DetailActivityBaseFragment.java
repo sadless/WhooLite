@@ -50,7 +50,6 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
     protected Spinner mRight;
     protected ProgressDialog mProgress;
     protected EditText mMemo;
-    protected EditText mSearchKeyword;
 
     protected String mSectionId;
     protected String mLeftAccountType;
@@ -93,7 +92,6 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         mRight.setTag(AccountsAdapter.DIRECTION_RIGHT);
         mRight.setOnItemSelectedListener(mListener);
         mMemo = (EditText) view.findViewById(R.id.memo);
-        mSearchKeyword = (EditText) view.findViewById(R.id.search_keyword);
         mSectionId = PreferenceManager.getDefaultSharedPreferences(getActivity())
                 .getString(PreferenceKeys.CURRENT_SECTION_ID, null);
         if (savedInstanceState == null) {
