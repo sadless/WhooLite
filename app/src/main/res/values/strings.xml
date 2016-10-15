@@ -62,6 +62,7 @@
     <string name="save_frequent_item_failed">자주입력 거래를 수정하지 못했습니다. 네트워크 상태를 확인하시고 다시 시도해주세요.</string>
     <string name="input_entry_failed_message">거래를 입력하지 못했습니다. 네트워크 상태를 확인하시고 다시 시도해주세요.</string>
     <string name="input_entry_success">거래를 입력하였습니다.</string>
+    <string name="edit_entry_success">거래가 수정되었습니다.</string>
     <string name="delete_frequent_item_failed">자주입력 거래를 삭제하지 못했습니다. 네트워크 상태를 확인하시고 다시 시도해주세요.</string>
     <string name="delete_failed">삭제 실패</string>
     <string name="delete_frequent_item_confirm">자주입력 거래를 삭제하시겠습니까?</string>
@@ -102,6 +103,9 @@
     <string name="manual_3">거래 입력 버튼을 터치하거나 길게 눌러 바로 입력하거나 수정 후 입력할 수 있습니다.</string>
     <string name="action_copy">복사</string>
     <string name="search_keyword">검색용 키워드</string>
+    <string name="merge">병합하기</string>
+    <string name="merge_confirm">최근 내역중에 같은 내용으로 입력된 항목이 있습니다. 금액을 더해서 하나의 항목으로 병합할까요?</string>
+    <string name="new_entry">새 항목으로 입력</string>
 
     <string-array name="pref_show_slot_number_titles">
         <item>1번 슬롯</item>
@@ -115,4 +119,5 @@
         <item>최근 사용한 순서로</item>
     </string-array>
     <string name="title_activity_manual">사용법</string>
+    <string name="title_activity_select_merging_entry">병합할 항목 선택</string>
 </resources>

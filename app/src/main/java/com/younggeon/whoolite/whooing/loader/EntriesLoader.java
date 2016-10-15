@@ -41,7 +41,7 @@ public class EntriesLoader extends WhooingBaseLoader {
     public Integer loadInBackground() {
         String sectionId = args.getString(WhooingKeyValues.SECTION_ID);
 
-        switch (mMethod) {
+        switch (method) {
             case Request.Method.POST: {
                 Uri.Builder builder = Uri.parse(URI_ENTRIES + ".json").buildUpon();
                 String frequentItemId = args.getString(WhooingKeyValues.ITEM_ID);
@@ -50,7 +50,7 @@ public class EntriesLoader extends WhooingBaseLoader {
 
                 args.remove(WhooingKeyValues.ITEM_ID);
                 args.remove(ARG_SLOT_NUMBER);
-                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                         builder.build().toString(),
                         mRequestFuture,
                         mRequestFuture,
@@ -62,20 +62,11 @@ public class EntriesLoader extends WhooingBaseLoader {
                     resultCode = result.optInt(WhooingKeyValues.CODE);
                     if (resultCode == WhooingKeyValues.SUCCESS) {
                         JSONObject resultItem = result.optJSONArray(WhooingKeyValues.RESULT).optJSONObject(0);
+
                         Realm realm = Realm.getDefaultInstance();
 
                         realm.beginTransaction();
-                        if (slotNumber > 0) {
-                            FrequentItem frequentItem = realm.where(FrequentItem.class)
-                                    .equalTo("sectionId", sectionId)
-                                    .equalTo("slotNumber", slotNumber)
-                                    .equalTo("itemId", frequentItemId).findFirst();
-
-                            if (frequentItem != null) {
-                                frequentItem.setUseCount(frequentItem.getUseCount() + 1);
-                                frequentItem.setLastUseTime((new Date()).getTime());
-                            }
-                        }
+                        updateUseInfo(realm, sectionId, slotNumber, frequentItemId);
                         realm.copyToRealmOrUpdate(createEntryObjectFromJson(resultItem, sectionId));
                         realm.commitTransaction();
                         realm.close();
@@ -98,7 +89,7 @@ public class EntriesLoader extends WhooingBaseLoader {
                     long entryId = args.getLong(WhooingKeyValues.ENTRY_ID);
 
                     builder.appendPath(entryId + ".json");
-                    WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                    WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                             builder.build().toString(),
                             mRequestFuture,
                             mRequestFuture,
@@ -138,7 +129,7 @@ public class EntriesLoader extends WhooingBaseLoader {
                     }
                     query.endGroup();
                     builder.appendEncodedPath(itemIdsPath + ".json");
-                    WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                    WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                             builder.build().toString(),
                             mRequestFuture,
                             mRequestFuture,
@@ -168,10 +159,14 @@ public class EntriesLoader extends WhooingBaseLoader {
                 Uri.Builder builder = Uri.parse(URI_ENTRIES).buildUpon();
                 int resultCode;
                 long entryId = args.getLong(WhooingKeyValues.ENTRY_ID);
+                int slotNumber = args.getInt(ARG_SLOT_NUMBER, -1);
+                String frequentItemId = args.getString(WhooingKeyValues.ITEM_ID);
 
                 builder.appendPath(entryId + ".json");
                 args.remove(WhooingKeyValues.ENTRY_ID);
-                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                args.remove(ARG_SLOT_NUMBER);
+                args.remove(WhooingKeyValues.ITEM_ID);
+                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                         builder.build().toString(),
                         mRequestFuture,
                         mRequestFuture,
@@ -189,6 +184,7 @@ public class EntriesLoader extends WhooingBaseLoader {
                                 .equalTo("entryId", entryId).findFirst();
 
                         realm.beginTransaction();
+                        updateUseInfo(realm, sectionId, slotNumber, frequentItemId);
                         setEntryFromJson(entry, resultItem);
                         realm.commitTransaction();
                         realm.close();
@@ -198,6 +194,8 @@ public class EntriesLoader extends WhooingBaseLoader {
                     resultCode = -1;
                 }
                 args.putLong(WhooingKeyValues.ENTRY_ID, entryId);
+                args.putInt(ARG_SLOT_NUMBER, slotNumber);
+                args.putString(WhooingKeyValues.ITEM_ID, frequentItemId);
 
                 return resultCode;
             }
@@ -206,7 +204,7 @@ public class EntriesLoader extends WhooingBaseLoader {
 
                 builder.appendPath("latest.json")
                         .appendQueryParameter(WhooingKeyValues.SECTION_ID, sectionId);
-                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                         builder.build().toString(),
                         mRequestFuture,
                         mRequestFuture,
@@ -279,5 +277,19 @@ public class EntriesLoader extends WhooingBaseLoader {
         object.setRightAccountId(entry.optString(WhooingKeyValues.RIGHT_ACCOUNT_ID));
         object.setMemo(entry.optString(WhooingKeyValues.MEMO));
         object.setEntryDateRaw(entry.optDouble(WhooingKeyValues.ENTRY_DATE));
+    }
+
+    private void updateUseInfo(Realm realm, String sectionId, int slotNumber, String itemId) {
+        if (slotNumber > 0) {
+            FrequentItem frequentItem = realm.where(FrequentItem.class)
+                    .equalTo("sectionId", sectionId)
+                    .equalTo("slotNumber", slotNumber)
+                    .equalTo("itemId", itemId).findFirst();
+
+            if (frequentItem != null) {
+                frequentItem.setUseCount(frequentItem.getUseCount() + 1);
+                frequentItem.setLastUseTime((new Date()).getTime());
+            }
+        }
     }
 }

@@ -255,6 +255,7 @@ public class WhooingLoginActivityFragment extends Fragment implements LoaderMana
 
             WhooLiteNetwork.requestQueue.add(new JsonObjectRequest(Request.Method.GET,
                     uri.toString(),
+                    null,
                     requestFuture,
                     requestFuture));
             try {
@@ -288,6 +289,7 @@ public class WhooingLoginActivityFragment extends Fragment implements LoaderMana
 
             WhooLiteNetwork.requestQueue.add(new JsonObjectRequest(Request.Method.GET,
                     uri.toString(),
+                    null,
                     requestFuture,
                     requestFuture));
             try {

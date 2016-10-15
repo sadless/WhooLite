@@ -42,8 +42,8 @@
             android:parentActivityName=".activity.WelcomeActivity"
             android:theme="@style/AppTheme">
             <meta-data
-            android:name="android.support.PARENT_ACTIVITY"
-            android:value="com.younggeon.whoolite.activity.WelcomeActivity" />
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.younggeon.whoolite.activity.WelcomeActivity" />
         </activity>
         <activity
             android:name=".activity.FrequentlyInputItemDetailActivity"
@@ -81,6 +81,10 @@
             android:name="com.google.android.gms.ads.AdActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"
             android:theme="@android:style/Theme.Translucent" />
+        <activity
+            android:name=".activity.SelectMergingEntryActivity"
+            android:label="@string/title_activity_select_merging_entry"
+            android:theme="@style/AppTheme"/>
     </application>
 
 </manifest>

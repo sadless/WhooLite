@@ -50,7 +50,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
 
     @Override
     public Integer loadInBackground() {
-        switch (mMethod) {
+        switch (method) {
             case Request.Method.DELETE: {
                 String sectionId = args.getString(WhooingKeyValues.SECTION_ID);
                 ArrayList<String> selectedItems = args.getStringArrayList(ARG_SELECTED_ITEMS);
@@ -191,7 +191,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                 if (oldSlot == newSlot) {
                     builder.appendPath("slot" + newSlot)
                             .appendPath(itemId + ".json");
-                    WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                    WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                             builder.build().toString(),
                             mRequestFuture,
                             mRequestFuture,
@@ -242,7 +242,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                 Uri.Builder builder = Uri.parse(URI_FREQUENT_ITEMS + ".json_array").buildUpon();
 
                 builder.appendQueryParameter(WhooingKeyValues.SECTION_ID, sectionId);
-                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                         builder.build().toString(),
                         mRequestFuture,
                         mRequestFuture,
@@ -315,7 +315,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
         int resultCode;
         Realm realm = Realm.getDefaultInstance();
 
-        if (mMethod == Request.Method.PUT) {
+        if (method == Request.Method.PUT) {
             FrequentItem frequentItem = realm.where(FrequentItem.class).equalTo("sectionId", sectionId)
                     .equalTo("slotNumber", slotNumber)
                     .equalTo("itemId", itemId).findFirst();
@@ -396,7 +396,7 @@ public class FrequentItemsLoader extends WhooingBaseLoader {
                     FrequentItem frequentItem = createFrequentItemObjectFromJson(resultItem,
                             sectionId, slotNumber, sortOrder);
 
-                    if (mMethod == Request.Method.PUT) {
+                    if (method == Request.Method.PUT) {
                         frequentItem.setUseCount(mUseCount);
                         frequentItem.setLastUseTime(mLastUseTime);
                         frequentItem.setSearchKeyword(mSearchKeyword);

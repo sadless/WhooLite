@@ -35,7 +35,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.Locale;
 
 import io.realm.Realm;
 
@@ -47,7 +46,6 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
     private static final String INSTANCE_STATE_SELECT_SLOT_NUMBER_DIALOG = "select_slot_number_dialog";
 
     private static final int LOADER_ID_BOOKMARK = 1;
-    private static final int LOADER_ID_EDIT_SEND = 2;
 
     private Button mDate;
     private AlertDialog mSelectSlotNumberDialog;
@@ -56,10 +54,39 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
     private long mEntryId;
     private SimpleDateFormat mSectionDateFormat;
     private String[] mSlotNumberItems;
-    private SimpleDateFormat mEntryDateFormat;
+
+    private View.OnClickListener mDateClickListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View v) {
+            int dateValue = mEntryDate;
+            int year = dateValue / 10000;
+            int month, date;
+
+            dateValue %= 10000;
+            month = dateValue / 100;
+            date = dateValue % 100;
+            new DatePickerDialog(getActivity(),
+                    new DatePickerDialog.OnDateSetListener() {
+                        @Override
+                        public void onDateSet(DatePicker view, int year, int monthOfYear, int dayOfMonth) {
+                            mEntryDate = year * 10000 + (monthOfYear + 1) * 100 + dayOfMonth;
+
+                            GregorianCalendar date = new GregorianCalendar(year,
+                                    monthOfYear,
+                                    dayOfMonth);
+
+                            mDate.setText(mSectionDateFormat.format(date.getTime()));
+                        }
+                    }, year,
+                    month - 1,
+                    date).show();
+        }
+    };
 
     @Override
-    protected void initialize() {
+    protected void initialize(View view) {
+        mDate = (Button) view.findViewById(R.id.date);
+        mDate.setOnClickListener(mDateClickListener);
         if (mEntryId >= 0) {
             Realm realm = Realm.getDefaultInstance();
             Entry entry = realm.where(Entry.class).equalTo("sectionId", mSectionId)
@@ -109,41 +136,8 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
         Intent intent = getActivity().getIntent();
 
         mEntryId = intent.getLongExtra(HistoryDetailActivity.EXTRA_ENTRY_ID, -1);
-        mEntryDateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
 
         View view = super.onCreateView(inflater, container, savedInstanceState);
-
-        if (view != null) {
-            mDate = (Button) view.findViewById(R.id.date);
-            mDate.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    int dateValue = mEntryDate;
-                    int year = dateValue / 10000;
-                    int month, date;
-
-                    dateValue %= 10000;
-                    month = dateValue / 100;
-                    date = dateValue % 100;
-                    new DatePickerDialog(getActivity(),
-                            new DatePickerDialog.OnDateSetListener() {
-                                @Override
-                                public void onDateSet(DatePicker view, int year, int monthOfYear, int dayOfMonth) {
-                                    mEntryDate = year * 10000 + (monthOfYear + 1) * 100 + dayOfMonth;
-
-                                    GregorianCalendar date = new GregorianCalendar(year,
-                                            monthOfYear,
-                                            dayOfMonth);
-
-                                    mDate.setText(mSectionDateFormat.format(date.getTime()));
-                                }
-                            }, year,
-                            month - 1,
-                            date).show();
-                    }
-            });
-        }
-
         Section section = Realm.getDefaultInstance().where(Section.class).equalTo("sectionId", mSectionId).findFirst();
 
         if (section != null) {
@@ -155,6 +149,9 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
             if (savedInstanceState.getBoolean(INSTANCE_STATE_SELECT_SLOT_NUMBER_DIALOG)) {
                 showSelectSlotNumberDialog();
             }
+            assert view != null;
+            mDate = (Button) view.findViewById(R.id.date);
+            mDate.setOnClickListener(mDateClickListener);
         }
         try {
             mDate.setText(mSectionDateFormat.format(mEntryDateFormat.parse("" + mEntryDate)));
@@ -162,12 +159,6 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
             e.printStackTrace();
         }
         getLoaderManager().initLoader(LOADER_ID_BOOKMARK, null, this);
-        if (mEntryId >= 0) {
-            getLoaderManager().initLoader(LOADER_ID_EDIT_SEND, null, this);
-            getLoaderManager().initLoader(LOADER_ID_DELETE, null, this);
-        } else {
-            getLoaderManager().initLoader(LOADER_ID_SEND, null, this);
-        }
 
         return view;
     }
@@ -213,10 +204,7 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                 } else if (TextUtils.isEmpty(mRightAccountType)) {
                     mRight.performClick();
                 } else {
-                    mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
-
                     if (mEntryId >= 0) {
-                        EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().getLoader(LOADER_ID_EDIT_SEND));
                         Bundle args = new Bundle();
 
                         args.putLong(WhooingKeyValues.ENTRY_ID, mEntryId);
@@ -229,13 +217,12 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                         args.putString(WhooingKeyValues.ITEM_TITLE, mTitle.getText().toString());
                         args.putString(WhooingKeyValues.MONEY, mMoney.getText().toString());
                         args.putString(WhooingKeyValues.MEMO, mMemo.getText().toString());
-                        loader.args = args;
-                        loader.forceLoad();
+                        editSend(args, true);
                     } else {
-                        EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().getLoader(LOADER_ID_SEND));
                         Bundle args = new Bundle();
 
                         args.putString(WhooingKeyValues.SECTION_ID, mSectionId);
+                        args.putString(WhooingKeyValues.ENTRY_DATE, "" + mEntryDate);
                         args.putString(WhooingKeyValues.LEFT_ACCOUNT_TYPE, mLeftAccountType);
                         args.putString(WhooingKeyValues.LEFT_ACCOUNT_ID, mLeftAccountId);
                         args.putString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE, mRightAccountType);
@@ -243,8 +230,7 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                         args.putString(WhooingKeyValues.ITEM_TITLE, mTitle.getText().toString());
                         args.putString(WhooingKeyValues.MONEY, mMoney.getText().toString());
                         args.putString(WhooingKeyValues.MEMO, mMemo.getText().toString());
-                        loader.args = args;
-                        loader.forceLoad();
+                        send(args);
                     }
                 }
 
@@ -257,15 +243,8 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                         .setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
-                                EntriesLoader loader = EntriesLoader.castLoader(
-                                        getLoaderManager().getLoader(LOADER_ID_DELETE));
-                                Bundle args = new Bundle();
-
                                 mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
-                                args.putString(WhooingKeyValues.SECTION_ID, mSectionId);
-                                args.putLong(WhooingKeyValues.ENTRY_ID, mEntryId);
-                                loader.args = args;
-                                loader.forceLoad();
+                                startDeleteEntryLoader(mEntryId);
                             }
                         }).setNegativeButton(R.string.cancel, null)
                         .create().show();
@@ -303,29 +282,20 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                         Request.Method.POST,
                         null);
             }
-            case LOADER_ID_SEND: {
-                return new EntriesLoader(getActivity(),
-                        Request.Method.POST,
-                        null);
-            }
-            case LOADER_ID_EDIT_SEND: {
-                return new EntriesLoader(getActivity(),
-                        Request.Method.PUT,
-                        null);
-            }
             case LOADER_ID_DELETE: {
                 return new EntriesLoader(getActivity(),
                         Request.Method.DELETE,
                         null);
             }
             default:{
-                return null;
+                return super.onCreateLoader(id, args);
             }
         }
     }
 
     @Override
     public void onLoadFinished(Loader loader, Object data) {
+        super.onLoadFinished(loader, data);
         switch (loader.getId()) {
             case LOADER_ID_BOOKMARK: {
                 if (mProgress != null) {
@@ -356,106 +326,6 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                             .create().show();
                 } else if (Utility.checkResultCodeWithAlert(getActivity(), code)) {
                     Toast.makeText(getActivity(), R.string.bookmark_selected_item_success, Toast.LENGTH_SHORT).show();
-                    getActivity().finish();
-                }
-                break;
-            }
-            case LOADER_ID_SEND: {
-                if (mProgress != null) {
-                    mProgress.dismiss();
-                }
-
-                int code = (Integer) data;
-
-                if (code < 0) {
-                    final EntriesLoader finalLoader = (EntriesLoader) loader;
-
-                    new AlertDialog.Builder(getActivity())
-                            .setTitle(R.string.input_entry_failed)
-                            .setMessage(R.string.input_entry_failed_message)
-                            .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
-
-                                    EntriesLoader loader = EntriesLoader.castLoader(
-                                            getLoaderManager().restartLoader(LOADER_ID_SEND,
-                                                    null,
-                                                    HistoryDetailActivityFragment.this));
-
-                                    loader.args = finalLoader.args;
-                                    loader.forceLoad();
-                                }
-                            }).setNegativeButton(R.string.cancel, null)
-                            .create().show();
-                } else if (Utility.checkResultCodeWithAlert(getActivity(), code)) {
-                    Toast.makeText(getActivity(), R.string.input_entry_success, Toast.LENGTH_LONG).show();
-                    getActivity().finish();
-                }
-                break;
-            }
-            case LOADER_ID_EDIT_SEND: {
-                if (mProgress != null) {
-                    mProgress.dismiss();
-                }
-
-                int result = (Integer) data;
-
-                if (result < 0) {
-                    final EntriesLoader editSendLoader = (EntriesLoader) loader;
-
-                    new AlertDialog.Builder(getActivity())
-                            .setTitle(R.string.edit_failed)
-                            .setMessage(R.string.edit_entry_failed)
-                            .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
-
-                                    EntriesLoader loader = EntriesLoader.castLoader(
-                                            getLoaderManager().restartLoader(LOADER_ID_EDIT_SEND,
-                                                    null,
-                                                    HistoryDetailActivityFragment.this));
-
-                                    loader.args = editSendLoader.args;
-                                    loader.forceLoad();
-                                }
-                            }).setNegativeButton(R.string.cancel, null)
-                            .create().show();
-                } else if (Utility.checkResultCodeWithAlert(getActivity(), result)) {
-                    getActivity().finish();
-                }
-                break;
-            }
-            case LOADER_ID_DELETE: {
-                if (mProgress != null) {
-                    mProgress.dismiss();
-                }
-
-                int result = (Integer) data;
-
-                if (result < 0) {
-                    final EntriesLoader finalLoader = (EntriesLoader) loader;
-
-                    new AlertDialog.Builder(getActivity())
-                            .setTitle(R.string.delete_failed)
-                            .setMessage(R.string.delete_entry_faield)
-                            .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
-
-                                    EntriesLoader loader = EntriesLoader.castLoader(
-                                            getLoaderManager().restartLoader(LOADER_ID_DELETE,
-                                                    null,
-                                                    HistoryDetailActivityFragment.this));
-
-                                    loader.args = finalLoader.args;
-                                    loader.forceLoad();
-                                }
-                            }).setNegativeButton(R.string.cancel, null)
-                            .create().show();
-                } else if (Utility.checkResultCodeWithAlert(getActivity(), result)) {
                     getActivity().finish();
                 }
                 break;

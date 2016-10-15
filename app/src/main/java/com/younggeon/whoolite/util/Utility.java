@@ -3,6 +3,7 @@ package com.younggeon.whoolite.util;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AlertDialog;
 import android.view.View;
@@ -14,7 +15,9 @@ import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.activity.WelcomeActivity;
 import com.younggeon.whoolite.constant.Actions;
 import com.younggeon.whoolite.constant.PreferenceKeys;
+import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.realm.Account;
+import com.younggeon.whoolite.realm.Entry;
 import com.younggeon.whoolite.realm.FrequentItem;
 import com.younggeon.whoolite.realm.Section;
 
@@ -22,6 +25,8 @@ import java.text.SimpleDateFormat;
 import java.util.Locale;
 
 import io.realm.Realm;
+import io.realm.RealmQuery;
+import io.realm.RealmResults;
 
 /**
  * Created by sadless on 2015. 10. 19..
@@ -100,5 +105,29 @@ public class Utility {
 
         adView.loadAd(adRequest);
         adView.setVisibility(View.VISIBLE);
+    }
+
+    public static RealmResults<Entry> getDuplicateEntries(Realm realm, Bundle args) {
+        String memo = args.getString(WhooingKeyValues.MEMO);
+        long entryId = args.getLong(WhooingKeyValues.ENTRY_ID, -1);
+
+        if (memo == null) {
+            memo = "";
+        }
+
+        RealmQuery<Entry> query = realm.where(Entry.class).equalTo("sectionId", args.getString(WhooingKeyValues.SECTION_ID))
+                .equalTo("entryDate", Integer.parseInt(args.getString(WhooingKeyValues.ENTRY_DATE)))
+                .equalTo("title", args.getString(WhooingKeyValues.ITEM_TITLE))
+                .equalTo("leftAccountType", args.getString(WhooingKeyValues.LEFT_ACCOUNT_TYPE))
+                .equalTo("leftAccountId", args.getString(WhooingKeyValues.LEFT_ACCOUNT_ID))
+                .equalTo("rightAccountType", args.getString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE))
+                .equalTo("rightAccountId", args.getString(WhooingKeyValues.RIGHT_ACCOUNT_ID))
+                .equalTo("memo", memo);
+
+        if (entryId >= 0) {
+            query = query.notEqualTo("entryId", entryId);
+        }
+
+        return query.findAll();
     }
 }

@@ -1,6 +1,9 @@
 package com.younggeon.whoolite.fragment;
 
+import android.app.Activity;
 import android.app.ProgressDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.databinding.DataBindingUtil;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
@@ -9,6 +12,7 @@ import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.Loader;
+import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,12 +22,22 @@ import android.widget.BaseAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.android.volley.Request;
 import com.younggeon.whoolite.R;
+import com.younggeon.whoolite.activity.SelectMergingEntryActivity;
 import com.younggeon.whoolite.constant.PreferenceKeys;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
 import com.younggeon.whoolite.databinding.SpinnerItemAccountBinding;
 import com.younggeon.whoolite.realm.Account;
+import com.younggeon.whoolite.realm.Entry;
+import com.younggeon.whoolite.util.Utility;
+import com.younggeon.whoolite.whooing.loader.EntriesLoader;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 import io.realm.Realm;
 import io.realm.RealmChangeListener;
@@ -36,13 +50,23 @@ import io.realm.Sort;
  */
 public abstract class DetailActivityBaseFragment extends Fragment implements LoaderManager.LoaderCallbacks {
     protected static final int LOADER_ID_DELETE = 101;
-    protected static final int LOADER_ID_SEND = 102;
+    private static final int LOADER_ID_SEND = 102;
+    private static final int LOADER_ID_EDIT_SEND = 103;
 
     private static final String INSTANCE_STATE_LEFT_ACCOUNT_TYPE = "left_account_type";
     private static final String INSTANCE_STATE_LEFT_ACCOUNT_ID = "left_account_id";
     private static final String INSTANCE_STATE_RIGHT_ACCOUNT_TYPE = "right_account_type";
     private static final String INSTANCE_STATE_RIGHT_ACCOUNT_ID = "right_account_id";
     private static final String INSTANCE_STATE_PROGRESSING = "progressing";
+    private static final String INSTANCE_STATE_SEND_MERGE_DIALOG = "send_merge_dialog";
+    private static final String INSTANCE_STATE_EDIT_SEND_MERGE_DIALOG = "edit_send_merge_dialog";
+    private static final String INSTANCE_STATE_SEND_ARGUMENTS = "send_arguments";
+    private static final String INSTANCE_STATE_MERGING_ITEM_SPECIFIED = "merging_item_specified";
+    private static final String INSTANCE_STATE_ADDING_MONEY = "adding_money";
+    private static final String INSTANCE_STATE_ENTRY_ID_FOR_MERGING = "entry_id_for_merging";
+
+    private static final int REQUEST_CODE_MERGE_FOR_SEND = 1;
+    private static final int REQUEST_CODE_MERGE_FOR_EDIT_SEND = 2;
 
     protected EditText mTitle;
     protected EditText mMoney;
@@ -57,14 +81,21 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
     protected String mRightAccountType;
     protected String mRightAccountId;
     protected int mLayoutId;
+    protected SimpleDateFormat mEntryDateFormat;
 
     private Realm mRealm;
     private RealmQuery<Account> mLeftQuery;
     private RealmQuery<Account> mRightQuery;
     private RealmResults<Account> mLeftAccounts;
     private RealmResults<Account> mRightAccounts;
+    private AlertDialog mSendMergeAlertDialog;
+    private AlertDialog mEditSendMergeAlertDialog;
+    private Bundle mSendArguments;
+    private boolean mMergingItemSpecified;
+    private double mAddingMoney;
+    private long mEntryIdForMerging = -1;
 
-    abstract protected void initialize();
+    abstract protected void initialize(View view);
 
     private AdapterView.OnItemSelectedListener mListener = new AdapterView.OnItemSelectedListener() {
         @Override
@@ -94,15 +125,24 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         mMemo = (EditText) view.findViewById(R.id.memo);
         mSectionId = PreferenceManager.getDefaultSharedPreferences(getActivity())
                 .getString(PreferenceKeys.CURRENT_SECTION_ID, null);
+        mEntryDateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
         if (savedInstanceState == null) {
-            initialize();
+            initialize(view);
         } else {
             mLeftAccountType = savedInstanceState.getString(INSTANCE_STATE_LEFT_ACCOUNT_TYPE);
             mLeftAccountId = savedInstanceState.getString(INSTANCE_STATE_LEFT_ACCOUNT_ID);
             mRightAccountType = savedInstanceState.getString(INSTANCE_STATE_RIGHT_ACCOUNT_TYPE);
             mRightAccountId = savedInstanceState.getString(INSTANCE_STATE_RIGHT_ACCOUNT_ID);
+            mSendArguments = savedInstanceState.getBundle(INSTANCE_STATE_SEND_ARGUMENTS);
+            mAddingMoney = savedInstanceState.getDouble(INSTANCE_STATE_ADDING_MONEY);
+            mMergingItemSpecified = savedInstanceState.getBoolean(INSTANCE_STATE_MERGING_ITEM_SPECIFIED);
+            mEntryIdForMerging = savedInstanceState.getLong(INSTANCE_STATE_ENTRY_ID_FOR_MERGING);
             if (savedInstanceState.getBoolean(INSTANCE_STATE_PROGRESSING, false)) {
                 mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
+            } else if (savedInstanceState.getBoolean(INSTANCE_STATE_SEND_MERGE_DIALOG)) {
+                showSendMergeAlertDialog();
+            } else if (savedInstanceState.getBoolean(INSTANCE_STATE_EDIT_SEND_MERGE_DIALOG)) {
+                showEditSendMergeAlertDialog();
             }
         }
 
@@ -128,6 +168,8 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         });
         rightChanged();
         getLoaderManager().initLoader(LOADER_ID_DELETE, null, this);
+        getLoaderManager().initLoader(LOADER_ID_SEND, null, this);
+        getLoaderManager().initLoader(LOADER_ID_EDIT_SEND, null, this);
         setHasOptionsMenu(true);
 
         return view;
@@ -144,6 +186,16 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         if (mProgress != null) {
             outState.putBoolean(INSTANCE_STATE_PROGRESSING, mProgress.isShowing());
         }
+        if (mSendMergeAlertDialog != null) {
+            outState.putBoolean(INSTANCE_STATE_SEND_MERGE_DIALOG, mSendMergeAlertDialog.isShowing());
+        }
+        if (mEditSendMergeAlertDialog != null) {
+            outState.putBoolean(INSTANCE_STATE_EDIT_SEND_MERGE_DIALOG, mEditSendMergeAlertDialog.isShowing());
+        }
+        outState.putDouble(INSTANCE_STATE_ADDING_MONEY, mAddingMoney);
+        outState.putBundle(INSTANCE_STATE_SEND_ARGUMENTS, mSendArguments);
+        outState.putBoolean(INSTANCE_STATE_MERGING_ITEM_SPECIFIED, mMergingItemSpecified);
+        outState.putLong(INSTANCE_STATE_ENTRY_ID_FOR_MERGING, mEntryIdForMerging);
     }
 
     @Override
@@ -152,6 +204,147 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         mLeftAccounts.removeChangeListeners();
         mRightAccounts.removeChangeListeners();
         mRealm.close();
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (resultCode == Activity.RESULT_OK) {
+            switch (requestCode) {
+                case REQUEST_CODE_MERGE_FOR_SEND: {
+                    getActivity().finish();
+                    break;
+                }
+                case REQUEST_CODE_MERGE_FOR_EDIT_SEND: {
+                    if (mEntryIdForMerging >= 0) {
+                        mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
+                        startDeleteEntryLoader(mEntryIdForMerging);
+                    } else {
+                        getActivity().finish();
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    @Override
+    public Loader onCreateLoader(int id, Bundle args) {
+        switch (id) {
+            case LOADER_ID_SEND: {
+                return new EntriesLoader(getActivity(),
+                        Request.Method.POST,
+                        null);
+            }
+            case LOADER_ID_EDIT_SEND: {
+                return new EntriesLoader(getActivity(),
+                        Request.Method.PUT,
+                        null);
+            }
+            default: {
+                return null;
+            }
+        }
+    }
+
+    @Override
+    public void onLoadFinished(Loader loader, Object data) {
+        switch (loader.getId()) {
+            case LOADER_ID_SEND: {
+                if (mProgress != null) {
+                    mProgress.dismiss();
+                }
+
+                int code = (Integer) data;
+
+                if (code < 0) {
+                    final EntriesLoader finalLoader = (EntriesLoader) loader;
+
+                    new AlertDialog.Builder(getActivity())
+                            .setTitle(R.string.input_entry_failed)
+                            .setMessage(R.string.input_entry_failed_message)
+                            .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
+
+                                    EntriesLoader loader = EntriesLoader.castLoader(
+                                            getLoaderManager().restartLoader(LOADER_ID_SEND,
+                                                    null,
+                                                    DetailActivityBaseFragment.this));
+
+                                    loader.args = finalLoader.args;
+                                    loader.forceLoad();
+                                }
+                            }).setNegativeButton(R.string.cancel, null)
+                            .create().show();
+                } else if (Utility.checkResultCodeWithAlert(getActivity(), code)) {
+                    Toast.makeText(getActivity(), R.string.input_entry_success, Toast.LENGTH_LONG).show();
+                    getActivity().finish();
+                }
+                break;
+            }
+            case LOADER_ID_EDIT_SEND: {
+                int result = (Integer) data;
+
+                if (result < 0) {
+                    if (mProgress != null) {
+                        mProgress.dismiss();
+                    }
+
+                    final EntriesLoader editSendLoader = (EntriesLoader) loader;
+
+                    new AlertDialog.Builder(getActivity())
+                            .setTitle(R.string.edit_failed)
+                            .setMessage(R.string.edit_entry_failed)
+                            .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    editSend(editSendLoader.args, false);
+                                }
+                            }).setNegativeButton(R.string.cancel, null)
+                            .create().show();
+                } else if (Utility.checkResultCodeWithAlert(getActivity(), result)) {
+                    if (mEntryIdForMerging < 0) {
+                        if (mProgress != null) {
+                            mProgress.dismiss();
+                        }
+                        Toast.makeText(getActivity(), R.string.edit_entry_success, Toast.LENGTH_LONG).show();
+                        getActivity().finish();
+                    } else {
+                        startDeleteEntryLoader(mEntryIdForMerging);
+                    }
+                }
+                break;
+            }
+            case LOADER_ID_DELETE: {
+                if (mProgress != null) {
+                    mProgress.dismiss();
+                }
+
+                int result = (Integer) data;
+
+                if (result < 0) {
+                    final EntriesLoader finalLoader = (EntriesLoader) loader;
+
+                    new AlertDialog.Builder(getActivity())
+                            .setTitle(R.string.delete_failed)
+                            .setMessage(R.string.delete_entry_faield)
+                            .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
+                                    startDeleteEntryLoader(finalLoader.args.getLong(WhooingKeyValues.ENTRY_ID));
+                                }
+                            }).setNegativeButton(R.string.cancel, null)
+                            .create().show();
+                } else if (Utility.checkResultCodeWithAlert(getActivity(), result)) {
+                    getActivity().finish();
+                }
+                break;
+            }
+        }
     }
 
     @Override
@@ -220,15 +413,148 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         mRight.setSelection(adapter.getSelection(mRightAccountType, mRightAccountId));
     }
 
+    protected void send(final Bundle args) {
+        if (args.getString(WhooingKeyValues.ENTRY_DATE) == null) {
+            args.putString(WhooingKeyValues.ENTRY_DATE, mEntryDateFormat.format(new Date()));
+        }
+
+        RealmResults<Entry> prevEntries = Utility.getDuplicateEntries(mRealm, args);
+
+        if (prevEntries.size() == 0) {
+            mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
+
+            EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().restartLoader(LOADER_ID_SEND, null, this));
+
+            loader.args = args;
+            loader.forceLoad();
+        } else {
+            if (mMergingItemSpecified = prevEntries.size() == 1) {
+                Entry entry = prevEntries.first();
+
+                mAddingMoney = entry.getMoney();
+                args.putLong(WhooingKeyValues.ENTRY_ID, entry.getEntryId());
+            }
+            mSendArguments = args;
+            showSendMergeAlertDialog();
+        }
+    }
+
+    protected void editSend(Bundle args, boolean needDuplicateCheck) {
+        if (needDuplicateCheck) {
+            RealmResults<Entry> prevEntries = Utility.getDuplicateEntries(mRealm, args);
+
+            if (prevEntries.size() > 0) {
+                if (mMergingItemSpecified = prevEntries.size() == 1) {
+                    Entry entry = prevEntries.first();
+
+                    mAddingMoney = entry.getMoney();
+                    mEntryIdForMerging = entry.getEntryId();
+                }
+                mSendArguments = args;
+                showEditSendMergeAlertDialog();
+
+                return;
+            }
+        }
+        mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
+
+        EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().restartLoader(LOADER_ID_EDIT_SEND, null, this));
+
+        loader.args = args;
+        loader.forceLoad();
+    }
+
+    protected void startDeleteEntryLoader(long entryId) {
+        EntriesLoader loader = EntriesLoader.castLoader(
+                getLoaderManager().restartLoader(LOADER_ID_DELETE, null, this));
+        Bundle args = new Bundle();
+
+        args.putString(WhooingKeyValues.SECTION_ID, mSectionId);
+        args.putLong(WhooingKeyValues.ENTRY_ID, entryId);
+        loader.args = args;
+        loader.forceLoad();
+    }
+
+    private void showSendMergeAlertDialog() {
+        mSendMergeAlertDialog = new AlertDialog.Builder(getContext())
+                .setTitle(R.string.merge)
+                .setMessage(R.string.merge_confirm)
+                .setPositiveButton(R.string.merge, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (mMergingItemSpecified) {
+                            double money = Double.parseDouble(mSendArguments.getString(WhooingKeyValues.MONEY));
+
+                            mSendArguments.putString(WhooingKeyValues.MONEY, "" + (money + mAddingMoney));
+                            editSend(mSendArguments, false);
+                        } else {
+                            Intent intent = new Intent(getContext(), SelectMergingEntryActivity.class);
+
+                            intent.putExtra(SelectMergingEntryActivity.EXTRA_MERGE_ARGUMENTS, mSendArguments);
+                            startActivityForResult(intent, REQUEST_CODE_MERGE_FOR_SEND);
+                        }
+                    }
+                }).setNegativeButton(R.string.new_entry, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
+                        mSendArguments.remove(WhooingKeyValues.ENTRY_ID);
+
+                        EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().restartLoader(LOADER_ID_SEND, null, DetailActivityBaseFragment.this));
+
+                        loader.args = mSendArguments;
+                        loader.forceLoad();
+                    }
+                }).create();
+        mSendMergeAlertDialog.show();
+    }
+
+    private void showEditSendMergeAlertDialog() {
+        mEditSendMergeAlertDialog = new AlertDialog.Builder(getContext())
+                .setTitle(R.string.merge)
+                .setMessage(R.string.merge_confirm)
+                .setPositiveButton(R.string.merge, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (mMergingItemSpecified) {
+                            double money = Double.parseDouble(mSendArguments.getString(WhooingKeyValues.MONEY));
+                            long entryId = mSendArguments.getLong(WhooingKeyValues.ENTRY_ID);
+
+                            mSendArguments.putString(WhooingKeyValues.MONEY, "" + (money + mAddingMoney));
+                            mSendArguments.putLong(WhooingKeyValues.ENTRY_ID, mEntryIdForMerging);
+                            mEntryIdForMerging = entryId;
+                            editSend(mSendArguments, false);
+                        } else {
+                            Intent intent = new Intent(getContext(), SelectMergingEntryActivity.class);
+
+                            mEntryIdForMerging = mSendArguments.getLong(WhooingKeyValues.ENTRY_ID);
+                            intent.putExtra(SelectMergingEntryActivity.EXTRA_MERGE_ARGUMENTS, mSendArguments);
+                            startActivityForResult(intent, REQUEST_CODE_MERGE_FOR_EDIT_SEND);
+                        }
+                    }
+                }).setNegativeButton(R.string.new_entry, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
+
+                        EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().restartLoader(LOADER_ID_EDIT_SEND, null, DetailActivityBaseFragment.this));
+
+                        loader.args = mSendArguments;
+                        loader.forceLoad();
+                    }
+                }).create();
+        mEditSendMergeAlertDialog.show();
+    }
+
     protected class AccountsAdapter extends BaseAdapter {
-        public static final int DIRECTION_LEFT = 1;
-        public static final int DIRECTION_RIGHT = 2;
+        static final int DIRECTION_LEFT = 1;
+        static final int DIRECTION_RIGHT = 2;
 
         private int mDirection;
         private String[] mTypes;
         private int[] mTypeCounts;
 
-        public AccountsAdapter(int direction) {
+        AccountsAdapter(int direction) {
             this.mDirection = direction;
             refresh();
         }
@@ -237,10 +563,10 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
         public int getCount() {
             switch (mDirection) {
                 case DIRECTION_LEFT: {
-                    return mLeftAccounts.size() + mTypes.length + 2;
+                    return mLeftAccounts.size() + mTypes.length + 1;
                 }
                 case DIRECTION_RIGHT: {
-                    return mRightAccounts.size() + mTypes.length + 2;
+                    return mRightAccounts.size() + mTypes.length + 1;
                 }
                 default:
                     return -1;
@@ -283,10 +609,6 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                     break;
                 }
                 default: {
-                    if (position == getCount() - 1) {
-                        tv.setText(R.string.unknown);
-                        break;
-                    }
                     position--;
 
                     Account account = getItem(getCursorPosition(position));
@@ -322,12 +644,6 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                     break;
                 }
                 default: {
-                    if (position == getCount() - 1) {
-                        binding.setSelectable(true);
-                        binding.setTitle(getString(R.string.unknown));
-                        binding.setMemo(null);
-                        break;
-                    }
                     position--;
 
                     int sum = 0;
@@ -437,9 +753,6 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                     return true;
                 }
                 default: {
-                    if (position == getCount() - 1) {
-                        return true;
-                    }
                     position--;
 
                     int sum = 0;

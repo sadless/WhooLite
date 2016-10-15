@@ -1,5 +1,6 @@
 package com.younggeon.whoolite.fragment;
 
+import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -12,7 +13,10 @@ import android.support.v7.view.ActionMode;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,6 +37,7 @@ import com.younggeon.whoolite.whooing.loader.WhooingBaseLoader;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 
 import io.realm.RealmChangeListener;
@@ -45,14 +50,18 @@ import io.realm.Sort;
  */
 public class HistoryFragment extends WhooLiteActivityBaseFragment {
     private static final int LOADER_ID_BOOKMARK_SELECTED_ITEMS = 1;
+    private static final int LOADER_ID_EDIT = 2;
 
     private static final String INSTANCE_STATE_SHOW_SELECT_SLOT_NUMBER = "show_select_slot_number";
+
+    public static final String ARG_MERGE_ARGUMENTS = "merge_arguments";
 
     private String[] mSlotNumberItems;
     private SimpleDateFormat mEntryDateFormat;
     private SimpleDateFormat mSectionDateFormat;
     private RealmQuery<Entry> mQuery;
     private RealmResults<Entry> mEntries;
+    private Bundle mMergeArguments;
 
     private AlertDialog mSelectSlotNumberDialog;
 
@@ -68,7 +77,18 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         super.onCreate(savedInstanceState);
 
         mDeleteConfirmStringId = R.string.delete_entries_confirm;
-        mActionMenuId = R.menu.action_menu_history;
+        if (getArguments() == null) {
+            mActionMenuId = R.menu.action_menu_history;
+        } else {
+            mActionMenuId = R.menu.action_menu_select_merging_entry;
+        }
+    }
+
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        super.onCreateOptionsMenu(menu, inflater);
+
+        inflater.inflate(R.menu.action_menu_select_merging_entry, menu);
     }
 
     @Override
@@ -94,6 +114,25 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     @Override
     protected void sectionChanged() {
         mQuery = mRealm.where(Entry.class).equalTo("sectionId", mSectionId);
+        if (mMergeArguments != null) {
+            String memo = mMergeArguments.getString(WhooingKeyValues.MEMO);
+            String entryDate = mMergeArguments.getString(WhooingKeyValues.ENTRY_DATE);
+
+            if (memo == null) {
+                memo = "";
+            }
+            if (entryDate == null) {
+                entryDate = new SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(new Date());
+            }
+            mQuery = mQuery.equalTo("sectionId", mMergeArguments.getString(WhooingKeyValues.SECTION_ID))
+                    .equalTo("entryDate", Integer.parseInt(entryDate))
+                    .equalTo("title", mMergeArguments.getString(WhooingKeyValues.ITEM_TITLE))
+                    .equalTo("leftAccountType", mMergeArguments.getString(WhooingKeyValues.LEFT_ACCOUNT_TYPE))
+                    .equalTo("leftAccountId", mMergeArguments.getString(WhooingKeyValues.LEFT_ACCOUNT_ID))
+                    .equalTo("rightAccountType", mMergeArguments.getString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE))
+                    .equalTo("rightAccountId", mMergeArguments.getString(WhooingKeyValues.RIGHT_ACCOUNT_ID))
+                    .equalTo("memo", memo);
+        }
         if (mEntries != null) {
             mEntries.removeChangeListeners();
         }
@@ -114,6 +153,13 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
             }
         }
         mEntryDateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
+        if (getArguments() != null) {
+            mMergeArguments = getArguments().getBundle(ARG_MERGE_ARGUMENTS);
+            mActionMenuId = R.menu.action_menu_select_merging_entry;
+            getLoaderManager().initLoader(LOADER_ID_EDIT, null, this);
+        } else {
+            mActionMenuId = R.menu.action_menu_history;
+        }
         getLoaderManager().initLoader(LOADER_ID_BOOKMARK_SELECTED_ITEMS, null, this);
         sectionChanged();
 
@@ -150,6 +196,11 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                 return new EntriesLoader(getActivity(),
                         Request.Method.GET,
                         bundle);
+            }
+            case LOADER_ID_EDIT: {
+                return new EntriesLoader(getActivity(),
+                        Request.Method.PUT,
+                        null);
             }
             default: {
                 return null;
@@ -193,6 +244,80 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                 getLoaderManager().restartLoader(LOADER_ID_BOOKMARK_SELECTED_ITEMS, null, this);
                 break;
             }
+            case LOADER_ID_EDIT: {
+                int code = (Integer) data;
+
+                if (code < 0) {
+                    if (mProgressDialog != null) {
+                        mProgressDialog.dismiss();
+                    }
+
+                    final EntriesLoader finalLoader = (EntriesLoader) loader;
+
+                    new AlertDialog.Builder(getActivity())
+                            .setTitle(R.string.edit_failed)
+                            .setMessage(R.string.edit_entry_failed)
+                            .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    startSendLoader(finalLoader.args);
+                                }
+                            }).setNegativeButton(R.string.cancel_input, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+                            getActivity().finish();
+                        }
+                    })
+                            .create().show();
+                } else if (Utility.checkResultCodeWithAlert(getActivity(), code)){
+                    if (mSelectedItems.size() > 0) {
+                        startDeleteLoader();
+                    } else {
+                        if (mProgressDialog != null) {
+                            mProgressDialog.dismiss();
+                        }
+                        getActivity().setResult(Activity.RESULT_OK);
+                        getActivity().finish();
+                        Toast.makeText(getActivity(), R.string.edit_entry_success, Toast.LENGTH_LONG).show();
+                    }
+                }
+                getLoaderManager().restartLoader(LOADER_ID_EDIT, null, this);
+                break;
+            }
+            case LOADER_ID_DELETE_SELECTED_ITEMS: {
+                if (mMergeArguments == null) {
+                    super.onLoadFinished(loader, data);
+                } else {
+                    if (mProgressDialog != null) {
+                        mProgressDialog.dismiss();
+                    }
+
+                    int code = (Integer) data;
+
+                    if (code < 0) {
+                        new AlertDialog.Builder(getActivity())
+                                .setTitle(R.string.delete_failed)
+                                .setMessage(R.string.delete_selected_items_failed)
+                                .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+                                        startDeleteLoader();
+                                    }
+                                }).setNegativeButton(R.string.cancel_input, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                getActivity().finish();
+                            }
+                        }).create().show();
+                    } else if (Utility.checkResultCodeWithAlert(getActivity(), code)) {
+                        getActivity().setResult(Activity.RESULT_OK);
+                        getActivity().finish();
+                        Toast.makeText(getActivity(), R.string.edit_entry_success, Toast.LENGTH_LONG).show();
+                    }
+                    getLoaderManager().restartLoader(LOADER_ID_DELETE_SELECTED_ITEMS, null, this);
+                }
+                break;
+            }
             default: {
                 super.onLoadFinished(loader, data);
 
@@ -206,6 +331,32 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         switch (item.getItemId()) {
             case R.id.action_bookmark: {
                 showSelectSlotNumber();
+
+                return true;
+            }
+            case R.id.action_send: {
+                Bundle args = (Bundle) mMergeArguments.clone();
+                RealmQuery<Entry> query = mRealm.where(Entry.class).equalTo("sectionId", mSectionId);
+
+                query.beginGroup().equalTo("entryId", Long.parseLong(mSelectedItems.get(0)));
+                for (int i = 1; i < mSelectedItems.size(); i++) {
+                    query.or().equalTo("entryId", Long.parseLong(mSelectedItems.get(i)));
+                }
+                query.endGroup();
+
+                RealmResults<Entry> selectedEntries = query.findAll();
+                double money = Double.parseDouble(mMergeArguments.getString(WhooingKeyValues.MONEY));
+
+                for (Entry entry : selectedEntries) {
+                    money += entry.getMoney();
+                }
+
+                long entryId = selectedEntries.get(0).getEntryId();
+
+                mSelectedItems.remove("" + entryId);
+                args.putLong(WhooingKeyValues.ENTRY_ID, entryId);
+                args.putString(WhooingKeyValues.MONEY, "" + money);
+                startSendLoader(args);
 
                 return true;
             }
@@ -254,10 +405,22 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         loader.forceLoad();
     }
 
+    private void startSendLoader(Bundle args) {
+        mProgressDialog = ProgressDialog.show(getActivity(),
+                null,
+                getString(R.string.please_wait));
+        mEntries.removeChangeListeners();
+
+        EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().getLoader(LOADER_ID_EDIT));
+
+        loader.args = args;
+        loader.forceLoad();
+    }
+
     private class HistoryItemViewHolder extends ItemViewHolder {
         public TextView memo;
 
-        public HistoryItemViewHolder(View itemView) {
+        HistoryItemViewHolder(View itemView) {
             super(itemView);
 
             memo = (TextView) itemView.findViewById(R.id.memo);
@@ -265,7 +428,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     }
 
     private class HistoryAdapter extends WhooLiteAdapter {
-        public HistoryAdapter(GridLayoutManager gridLayoutManager) {
+        HistoryAdapter(GridLayoutManager gridLayoutManager) {
             super(gridLayoutManager);
 
             mItemLayoutId = R.layout.recycler_item_entry;
@@ -283,20 +446,28 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
 
         @Override
         protected void itemClicked(View view, int dataPosition) {
-            Intent intent = new Intent(getActivity(),
-                    HistoryDetailActivity.class);
+            if (mMergeArguments == null) {
+                Intent intent = new Intent(getActivity(),
+                        HistoryDetailActivity.class);
 
-            intent.putExtra(HistoryDetailActivity.EXTRA_SECTION_ID, mSectionId);
-            intent.putExtra(HistoryDetailActivity.EXTRA_ENTRY_ID,
-                    mEntries.get(dataPosition).getEntryId());
-            ActivityCompat.startActivity(getActivity(),
-                    intent,
-                    ActivityOptionsCompat.makeScaleUpAnimation(view,
-                            0,
-                            0,
-                            view.getWidth(),
-                            view.getHeight()
-                    ).toBundle());
+                intent.putExtra(HistoryDetailActivity.EXTRA_SECTION_ID, mSectionId);
+                intent.putExtra(HistoryDetailActivity.EXTRA_ENTRY_ID,
+                        mEntries.get(dataPosition).getEntryId());
+                ActivityCompat.startActivity(getActivity(),
+                        intent,
+                        ActivityOptionsCompat.makeScaleUpAnimation(view,
+                                0,
+                                0,
+                                view.getWidth(),
+                                view.getHeight()
+                        ).toBundle());
+            } else {
+                if (mSelectedItems == null) {
+                    startActionMode((ItemViewHolder) view.getTag());
+                } else {
+                    toggleSelect((ItemViewHolder) view.getTag());
+                }
+            }
         }
 
         @Override

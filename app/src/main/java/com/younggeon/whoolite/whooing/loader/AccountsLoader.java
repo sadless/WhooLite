@@ -38,7 +38,7 @@ public class AccountsLoader extends WhooingBaseLoader {
 
     @Override
     public Integer loadInBackground() {
-        switch (mMethod) {
+        switch (method) {
             case Request.Method.GET: {
                 String sectionId = args.getString(WhooingKeyValues.SECTION_ID);
                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
@@ -46,7 +46,7 @@ public class AccountsLoader extends WhooingBaseLoader {
 
                 builder.appendQueryParameter(WhooingKeyValues.SECTION_ID, sectionId)
                         .appendQueryParameter(WhooingKeyValues.START_DATE, dateFormat.format(new Date()));
-                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                         builder.build().toString(),
                         mRequestFuture,
                         mRequestFuture,

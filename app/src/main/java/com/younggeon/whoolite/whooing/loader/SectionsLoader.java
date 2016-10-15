@@ -38,7 +38,7 @@ public class SectionsLoader extends WhooingBaseLoader {
 
     @Override
     public Integer loadInBackground() {
-        switch (mMethod) {
+        switch (method) {
             case Request.Method.GET: {
                 SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getContext());
                 int resultCode;
@@ -47,7 +47,7 @@ public class SectionsLoader extends WhooingBaseLoader {
                     Uri.Builder builder = Uri.parse(URI_SECTIONS).buildUpon();
 
                     builder.appendPath("default.json");
-                    WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                    WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                             builder.build().toString(),
                             mRequestFuture,
                             mRequestFuture,
@@ -72,7 +72,7 @@ public class SectionsLoader extends WhooingBaseLoader {
                     }
                     mRequestFuture = RequestFuture.newFuture();
                 }
-                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(mMethod,
+                WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                         URI_SECTIONS + ".json_array",
                         mRequestFuture,
                         mRequestFuture,

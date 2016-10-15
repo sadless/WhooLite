@@ -20,7 +20,6 @@ import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.Spinner;
-import android.widget.Toast;
 
 import com.android.volley.Request;
 import com.younggeon.whoolite.R;
@@ -50,13 +49,15 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
     private EditText mSearchKeyword;
 
     @Override
-    protected void initialize() {
+    protected void initialize(View view) {
         Realm realm = Realm.getDefaultInstance();
         FrequentItem frequentItem = realm.where(FrequentItem.class)
                 .equalTo("sectionId", mSectionId)
                 .equalTo("slotNumber", mOldSlotNumber)
                 .equalTo("itemId", mItemId).findFirst();
 
+        mSlotNumber = (Spinner) view.findViewById(R.id.slot_number);
+        mSearchKeyword = (EditText) view.findViewById(R.id.search_keyword);
         if (frequentItem != null) {
             double money = frequentItem.getMoney();
 
@@ -131,7 +132,8 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
 
         View view = super.onCreateView(inflater, container, savedInstanceState);
 
-        if (view != null) {
+        if (savedInstanceState != null) {
+            assert view != null;
             mSlotNumber = (Spinner) view.findViewById(R.id.slot_number);
             mSearchKeyword = (EditText) view.findViewById(R.id.search_keyword);
         }
@@ -162,8 +164,6 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
             default:
         }
         getLoaderManager().initLoader(LOADER_ID_SAVE, null, this);
-        getLoaderManager().initLoader(LOADER_ID_SEND, null, this);
-        getLoaderManager().initLoader(LOADER_ID_DELETE, null, this);
 
         return view;
     }
@@ -220,7 +220,6 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
                 } else {
                     switch (mMode) {
                         case FrequentlyInputItemDetailActivity.MODE_EDIT: {
-                            EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().getLoader(LOADER_ID_SEND));
                             Bundle args = new Bundle();
 
                             args.putInt(EntriesLoader.ARG_SLOT_NUMBER, mOldSlotNumber);
@@ -232,9 +231,7 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
                             args.putString(WhooingKeyValues.RIGHT_ACCOUNT_ID, mRightAccountId);
                             args.putString(WhooingKeyValues.ITEM_TITLE, mTitle.getText().toString());
                             args.putString(WhooingKeyValues.MONEY, mMoney.getText().toString());
-                            mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
-                            loader.args = args;
-                            loader.forceLoad();
+                            send(args);
                             break;
                         }
                         case FrequentlyInputItemDetailActivity.MODE_COMPLETE: {
@@ -303,24 +300,20 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
                         Request.Method.PUT,
                         null);
             }
-            case LOADER_ID_SEND: {
-                return new EntriesLoader(getActivity(),
-                        Request.Method.POST,
-                        null);
-            }
             case LOADER_ID_DELETE: {
                 return new FrequentItemsLoader(getActivity(),
                         Request.Method.DELETE,
                         null);
             }
             default: {
-                return null;
+                return super.onCreateLoader(id, args);
             }
         }
     }
 
     @Override
     public void onLoadFinished(Loader loader, Object data) {
+        super.onLoadFinished(loader, data);
         switch (loader.getId()) {
             case LOADER_ID_SAVE: {
                 if (mProgress != null) {
@@ -351,41 +344,6 @@ public class FrequentlyInputItemDetailActivityFragment extends DetailActivityBas
                             .create().show();
                 } else {
                     if (Utility.checkResultCodeWithAlert(getActivity(), resultCode)) {
-                        getActivity().finish();
-                    }
-                }
-                break;
-            }
-            case LOADER_ID_SEND: {
-                if (mProgress != null) {
-                    mProgress.dismiss();
-                }
-
-                int resultCode = (Integer) data;
-                final EntriesLoader finalLoader = (EntriesLoader) loader;
-
-                if (resultCode < 0) {
-                    new AlertDialog.Builder(getActivity())
-                            .setTitle(R.string.input_entry_failed)
-                            .setMessage(R.string.input_entry_failed_message)
-                            .setPositiveButton(R.string.retry, new DialogInterface.OnClickListener() {
-                                @Override
-                                public void onClick(DialogInterface dialog, int which) {
-                                    mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
-
-                                    EntriesLoader loader = EntriesLoader.castLoader(
-                                            getLoaderManager().restartLoader(LOADER_ID_SEND,
-                                                    null,
-                                                    FrequentlyInputItemDetailActivityFragment.this));
-
-                                    loader.args = finalLoader.args;
-                                    loader.forceLoad();
-                                }
-                            }).setNegativeButton(R.string.cancel, null)
-                            .create().show();
-                } else {
-                    if (Utility.checkResultCodeWithAlert(getActivity(), resultCode)) {
-                        Toast.makeText(getActivity(), R.string.input_entry_success, Toast.LENGTH_LONG).show();
                         getActivity().finish();
                     }
                 }

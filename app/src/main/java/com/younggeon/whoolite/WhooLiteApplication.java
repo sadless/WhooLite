@@ -15,7 +15,8 @@ public class WhooLiteApplication extends Application {
     public void onCreate() {
         super.onCreate();
 
-        Realm.setDefaultConfiguration(new RealmConfiguration.Builder(this)
+        Realm.init(this);
+        Realm.setDefaultConfiguration(new RealmConfiguration.Builder()
                 .schemaVersion(1)
                 .migration(new RealmMigration() {
                     @Override

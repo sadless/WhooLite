@@ -16,15 +16,15 @@ public abstract class WhooingBaseLoader extends AsyncTaskLoader<Integer> {
     public static final String ARG_SELECTED_ITEMS = "selected_items";
 
     public Bundle args;
+    public int method;
 
-    protected int mMethod;
-    protected RequestFuture<String> mRequestFuture;
-    protected String mApiKeyFormat;
+    RequestFuture<String> mRequestFuture;
+    String mApiKeyFormat;
 
-    public WhooingBaseLoader(Context context, int method, Bundle args) {
+    WhooingBaseLoader(Context context, int method, Bundle args) {
         super(context);
 
-        this.mMethod = method;
+        this.method = method;
         this.args = args;
         mRequestFuture = RequestFuture.newFuture();
         mApiKeyFormat = PreferenceManager.getDefaultSharedPreferences(context)

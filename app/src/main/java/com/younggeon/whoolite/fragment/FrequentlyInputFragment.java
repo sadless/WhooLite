@@ -33,14 +33,19 @@ import com.android.volley.Request;
 import com.h6ah4i.android.compat.content.SharedPreferenceCompat;
 import com.younggeon.whoolite.R;
 import com.younggeon.whoolite.activity.FrequentlyInputItemDetailActivity;
+import com.younggeon.whoolite.activity.SelectMergingEntryActivity;
 import com.younggeon.whoolite.constant.WhooingKeyValues;
+import com.younggeon.whoolite.realm.Entry;
 import com.younggeon.whoolite.realm.FrequentItem;
 import com.younggeon.whoolite.util.SoundSearcher;
 import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.EntriesLoader;
 import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.Locale;
 import java.util.Set;
 
 import io.realm.Realm;
@@ -54,6 +59,7 @@ import io.realm.Sort;
  */
 public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implements SharedPreferences.OnSharedPreferenceChangeListener {
     private static final int REQUEST_CODE_COMPLETE_FREQUENT_ITEM = 1;
+    private static final int REQUEST_CODE_MERGE_FOR_SEND = 2;
 
     private static final String INSTANCE_STATE_PROGRESSING_ITEM_ID_BUNDLE = "progressing_item_id_bundle";
     private static final String INSTANCE_STATE_LAST_LOADER_ID = "last_loader_id";
@@ -61,6 +67,10 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     private static final String INSTANCE_STATE_MULTI_INPUT_ARGS = "multi_input_args";
     private static final String INSTANCE_STATE_QUERY_TEXT = "query_text";
     private static final String INSTANCE_STATE_SEARCHED_TITLES = "searched_titles";
+    private static final String INSTANCE_STATE_SEND_MERGE_DIALOG = "send_merge_dialog";
+    private static final String INSTANCE_STATE_ADDING_MONEY = "adding_money";
+    private static final String INSTANCE_STATE_MERGING_ITEM_SPECIFIED = "merging_item_specified";
+    private static final String INSTANCE_STATE_SEND_ARGUMENTS = "send_arguments";
 
     private static final int LOADER_ID_QUERY = 1;
     private static final int LOADER_ID_ENTRY_INPUT_START = 10000;
@@ -75,6 +85,11 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     private RealmResults<FrequentItem> mFrequentItems;
     private String[] mSortOrderFields;
     private Sort[] mSortOrderValues;
+    private double mAddingMoney;
+    private boolean mMergingItemSpecified;
+    private Bundle mSendArguments;
+    private AlertDialog mSendMergeAlertDialog;
+    private SimpleDateFormat mEntryDateFormat;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -96,6 +111,12 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
             mMultiInputArgs = savedInstanceState.getParcelableArrayList(INSTANCE_STATE_MULTI_INPUT_ARGS);
             queryText = savedInstanceState.getString(INSTANCE_STATE_QUERY_TEXT);
             mSearchedTitles = savedInstanceState.getStringArrayList(INSTANCE_STATE_SEARCHED_TITLES);
+            mAddingMoney = savedInstanceState.getDouble(INSTANCE_STATE_ADDING_MONEY);
+            mMergingItemSpecified = savedInstanceState.getBoolean(INSTANCE_STATE_MERGING_ITEM_SPECIFIED);
+            mSendArguments = savedInstanceState.getBundle(INSTANCE_STATE_SEND_ARGUMENTS);
+            if (savedInstanceState.getBoolean(INSTANCE_STATE_SEND_MERGE_DIALOG)) {
+                showSendMergeAlertDialog();
+            }
         } else {
             mProgressingItemIdBundle = new Bundle();
             mLastLoaderId = LOADER_ID_ENTRY_INPUT_START;
@@ -104,6 +125,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
         View view = super.onCreateView(inflater, container, savedInstanceState);
 
+        mEntryDateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
         mQueryText.set(queryText);
         mBinding.setReceiveFailedText(getString(R.string.failed_to_receive_frequent_item));
         mBinding.setNoDataText(getString(R.string.no_frequent_items));
@@ -154,6 +176,12 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         outState.putParcelableArrayList(INSTANCE_STATE_MULTI_INPUT_ARGS, mMultiInputArgs);
         outState.putString(INSTANCE_STATE_QUERY_TEXT, mQueryText.get());
         outState.putStringArrayList(INSTANCE_STATE_SEARCHED_TITLES, mSearchedTitles);
+        outState.putDouble(INSTANCE_STATE_ADDING_MONEY, mAddingMoney);
+        outState.putBoolean(INSTANCE_STATE_MERGING_ITEM_SPECIFIED, mMergingItemSpecified);
+        outState.putBundle(INSTANCE_STATE_SEND_ARGUMENTS, mSendArguments);
+        if (mSendMergeAlertDialog != null) {
+            outState.putBoolean(INSTANCE_STATE_SEND_MERGE_DIALOG, mSendMergeAlertDialog.isShowing());
+        }
     }
 
     @Override
@@ -200,11 +228,15 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                     }
                     break;
                 }
+                case REQUEST_CODE_MERGE_FOR_SEND: {
+                    popAndAddToMultiInputArgsFromSelectedItems();
+                    break;
+                }
                 default:
             }
         } else {
             switch (requestCode) {
-                case REQUEST_CODE_COMPLETE_FREQUENT_ITEM: {
+                case REQUEST_CODE_COMPLETE_FREQUENT_ITEM:case REQUEST_CODE_MERGE_FOR_SEND: {
                     popAndAddToMultiInputArgsFromSelectedItems();
                     break;
                 }
@@ -320,9 +352,13 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
                                             }
                                         }
                                         mProgressingLoaderIds.add(finalLoader.getId());
-                                        getLoaderManager().restartLoader(finalLoader.getId(),
+
+                                        EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().restartLoader(finalLoader.getId(),
                                                 usedArgs,
-                                                FrequentlyInputFragment.this).forceLoad();
+                                                FrequentlyInputFragment.this));
+
+                                        loader.method = finalLoader.method;
+                                        loader.forceLoad();
                                     }
                                 }).setNegativeButton(R.string.cancel_input, null)
                                 .create().show();
@@ -443,15 +479,30 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     }
 
     private void inputEntry(Bundle args) {
-        mCurrentProgressingItemIds.add(args.getInt(EntriesLoader.ARG_SLOT_NUMBER) + ":" +
-                args.getString(WhooingKeyValues.ITEM_ID));
-        mBinding.recyclerView.getAdapter().notifyDataSetChanged();
-        synchronized (this) {
-            mProgressingLoaderIds.add(mLastLoaderId);
-            getLoaderManager().initLoader(mLastLoaderId,
-                    args,
-                    this).forceLoad();
-            mLastLoaderId++;
+        args.putString(WhooingKeyValues.ENTRY_DATE, mEntryDateFormat.format(new Date()));
+
+        RealmResults<Entry> prevEntries = Utility.getDuplicateEntries(mRealm, args);
+
+        if (prevEntries.size() > 0) {
+            if (mMergingItemSpecified = prevEntries.size() == 1) {
+                Entry entry = prevEntries.first();
+
+                mAddingMoney = entry.getMoney();
+                args.putLong(WhooingKeyValues.ENTRY_ID, entry.getEntryId());
+            }
+            mSendArguments = args;
+            showSendMergeAlertDialog();
+        } else {
+            mCurrentProgressingItemIds.add(args.getInt(EntriesLoader.ARG_SLOT_NUMBER) + ":" +
+                    args.getString(WhooingKeyValues.ITEM_ID));
+            mBinding.recyclerView.getAdapter().notifyDataSetChanged();
+            synchronized (this) {
+                mProgressingLoaderIds.add(mLastLoaderId);
+                getLoaderManager().initLoader(mLastLoaderId,
+                        args,
+                        this).forceLoad();
+                mLastLoaderId++;
+            }
         }
     }
 
@@ -554,11 +605,62 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
         }
     }
 
-    private class FrequentlyInputItemViewHolder extends ItemViewHolder {
-        public ImageButton send;
-        public ProgressBar progress;
+    private void showSendMergeAlertDialog() {
+        mSendMergeAlertDialog = new AlertDialog.Builder(getContext())
+                .setTitle(R.string.merge)
+                .setMessage(R.string.merge_confirm)
+                .setPositiveButton(R.string.merge, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (mMergingItemSpecified) {
+                            double money = Double.parseDouble(mSendArguments.getString(WhooingKeyValues.MONEY));
 
-        public FrequentlyInputItemViewHolder(View itemView) {
+                            mSendArguments.putString(WhooingKeyValues.MONEY, "" + (money + mAddingMoney));
+                            mCurrentProgressingItemIds.add(mSendArguments.getInt(EntriesLoader.ARG_SLOT_NUMBER) + ":" +
+                                    mSendArguments.getString(WhooingKeyValues.ITEM_ID));
+                            mBinding.recyclerView.getAdapter().notifyDataSetChanged();
+                            synchronized (this) {
+                                mProgressingLoaderIds.add(mLastLoaderId);
+
+                                EntriesLoader loader = EntriesLoader.castLoader(getLoaderManager().initLoader(mLastLoaderId,
+                                        mSendArguments,
+                                        FrequentlyInputFragment.this));
+
+                                loader.method = Request.Method.PUT;
+                                loader.forceLoad();
+                                mLastLoaderId++;
+                            }
+                        } else {
+                            Intent intent = new Intent(getContext(), SelectMergingEntryActivity.class);
+
+                            intent.putExtra(SelectMergingEntryActivity.EXTRA_MERGE_ARGUMENTS, mSendArguments);
+                            startActivityForResult(intent, REQUEST_CODE_MERGE_FOR_SEND);
+                        }
+                    }
+                }).setNegativeButton(R.string.new_entry, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        mCurrentProgressingItemIds.add(mSendArguments.getInt(EntriesLoader.ARG_SLOT_NUMBER) + ":" +
+                                mSendArguments.getString(WhooingKeyValues.ITEM_ID));
+                        mSendArguments.remove(WhooingKeyValues.ENTRY_ID);
+                        mBinding.recyclerView.getAdapter().notifyDataSetChanged();
+                        synchronized (this) {
+                            mProgressingLoaderIds.add(mLastLoaderId);
+                            getLoaderManager().initLoader(mLastLoaderId,
+                                    mSendArguments,
+                                    FrequentlyInputFragment.this).forceLoad();
+                            mLastLoaderId++;
+                        }
+                    }
+                }).create();
+        mSendMergeAlertDialog.show();
+    }
+
+    private class FrequentlyInputItemViewHolder extends ItemViewHolder {
+        ImageButton send;
+        ProgressBar progress;
+
+        FrequentlyInputItemViewHolder(View itemView) {
             super(itemView);
 
             send = (ImageButton) itemView.findViewById(R.id.send);
@@ -568,7 +670,7 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     }
 
     private class FrequentlyInputAdapter extends WhooLiteAdapter {
-        public FrequentlyInputAdapter(GridLayoutManager gridLayoutManager) {
+        FrequentlyInputAdapter(GridLayoutManager gridLayoutManager) {
             super(gridLayoutManager);
 
             mItemLayoutId = R.layout.recycler_item_frequent_item;
@@ -762,9 +864,9 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
     private static class QueryLoader extends AsyncTaskLoader<ArrayList<String>> {
         public String sectionId;
-        public String keyword;
+        String keyword;
 
-        public QueryLoader(Context context) {
+        QueryLoader(Context context) {
             super(context);
         }
 

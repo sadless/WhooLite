@@ -7,6 +7,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
+import android.content.res.Resources;
 import android.databinding.DataBindingUtil;
 import android.databinding.ObservableBoolean;
 import android.databinding.ObservableField;
@@ -54,6 +56,8 @@ import io.realm.RealmChangeListener;
 import io.realm.RealmModel;
 import io.realm.RealmQuery;
 import io.realm.RealmResults;
+
+import static com.younggeon.whoolite.R.string.item;
 
 /**
  * Created by sadless on 2016. 1. 5..
@@ -246,7 +250,9 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         mode.getMenuInflater().inflate(mActionMenuId, menu);
         mode.setTitle(getString(R.string.item_selected,
                 mSelectedItems.size()));
-        mBinding.recyclerView.getAdapter().notifyDataSetChanged();
+        if (mBinding.recyclerView.getAdapter() != null) {
+            mBinding.recyclerView.getAdapter().notifyDataSetChanged();
+        }
 
         return true;
     }
@@ -344,11 +350,13 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         mDeleteConfirmDialog.show();
     }
 
-    private void startDeleteLoader() {
-        mProgressTitle = getString(R.string.deleting);
-        mProgressDialog = ProgressDialog.show(getActivity(),
-                mProgressTitle,
-                getString(R.string.please_wait));
+    protected void startDeleteLoader() {
+        if (mProgressDialog == null || !mProgressDialog.isShowing()) {
+            mProgressTitle = getString(R.string.deleting);
+            mProgressDialog = ProgressDialog.show(getActivity(),
+                    mProgressTitle,
+                    getString(R.string.please_wait));
+        }
 
         Bundle args = new Bundle();
 
@@ -377,8 +385,14 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         WhooLiteAdapter adapter = (WhooLiteAdapter) mBinding.recyclerView.getAdapter();
 
         if (adapter == null) {
-            mBinding.recyclerView.setLayoutManager(new GridLayoutManager(getActivity(),
-                    getResources().getInteger(R.integer.input_item_span_count)));
+            Resources res = getResources();
+            int spanCount = res.getInteger(R.integer.input_item_span_count);
+
+            if (getActivity().isInMultiWindowMode() &&
+                    res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                spanCount--;
+            }
+            mBinding.recyclerView.setLayoutManager(new GridLayoutManager(getActivity(), spanCount));
             mBinding.recyclerView.setAdapter(createAdapter((GridLayoutManager) mBinding.recyclerView.getLayoutManager()));
         } else {
             adapter.refresh();
@@ -389,7 +403,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     protected class SectionViewHolder extends RecyclerView.ViewHolder {
         public RecyclerItemWhooliteSectionBinding binding;
 
-        public SectionViewHolder(View itemView) {
+        SectionViewHolder(View itemView) {
             super(itemView);
 
             binding = DataBindingUtil.bind(itemView);
@@ -401,11 +415,11 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         public TextView title;
         public TextView money;
         public TextView left;
-        public TextView right;
-        public Drawable iconSelectableBackground;
-        public Drawable itemViewSelectableBackground;
+        TextView right;
+        Drawable iconSelectableBackground;
+        Drawable itemViewSelectableBackground;
 
-        public ItemViewHolder(View itemView) {
+        ItemViewHolder(View itemView) {
             super(itemView);
 
             itemView.setTag(this);
@@ -421,14 +435,14 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     }
 
     protected abstract class WhooLiteAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-        protected static final int VIEW_TYPE_SECTION = 0;
-        protected static final int VIEW_TYPE_ITEM = 1;
+        static final int VIEW_TYPE_SECTION = 0;
+        static final int VIEW_TYPE_ITEM = 1;
 
         private TextDrawable.IBuilder mIconBuilder;
 
-        protected String[] mSectionTitles;
-        protected int[] mSectionDataCounts;
-        protected int mItemLayoutId;
+        String[] mSectionTitles;
+        int[] mSectionDataCounts;
+        int mItemLayoutId;
 
         abstract protected ItemViewHolder createItemViewHolder(View itemView);
         abstract protected void itemClicked(View view, int dataPosition);
@@ -442,7 +456,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         abstract protected long getValueForItemId(int dataPosition);
         abstract protected void refreshSections();
 
-        public WhooLiteAdapter(final GridLayoutManager gridLayoutManager) {
+        WhooLiteAdapter(final GridLayoutManager gridLayoutManager) {
             super();
 
             refreshSections();
@@ -696,12 +710,12 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             return VIEW_TYPE_ITEM;
         }
 
-        public void refresh() {
+        void refresh() {
             refreshSections();
             notifyDataSetChanged();
         }
 
-        protected int getDataPosition(int position) {
+        int getDataPosition(int position) {
             int sum = 0;
 
             if (mSectionDataCounts != null) {
@@ -718,7 +732,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             return position;
         }
 
-        private void startActionMode(ItemViewHolder vh) {
+        protected void startActionMode(ItemViewHolder vh) {
             if (mSelectedItems == null) {
                 mSelectedItems = new ArrayList<>();
             } else {
@@ -728,7 +742,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             mActionMode = ((AppCompatActivity) getActivity()).startSupportActionMode(WhooLiteActivityBaseFragment.this);
         }
 
-        private void toggleSelect(ItemViewHolder vh) {
+        protected void toggleSelect(ItemViewHolder vh) {
             int position = vh.getAdapterPosition();
             int cursorPosition = getDataPosition(position);
             String selectionId = getSelectionId(cursorPosition);
