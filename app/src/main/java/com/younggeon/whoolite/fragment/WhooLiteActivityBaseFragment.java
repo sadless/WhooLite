@@ -57,8 +57,6 @@ import io.realm.RealmModel;
 import io.realm.RealmQuery;
 import io.realm.RealmResults;
 
-import static com.younggeon.whoolite.R.string.item;
-
 /**
  * Created by sadless on 2016. 1. 5..
  */
@@ -388,7 +386,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
             Resources res = getResources();
             int spanCount = res.getInteger(R.integer.input_item_span_count);
 
-            if (getActivity().isInMultiWindowMode() &&
+            if ((Build.VERSION.SDK_INT >= 24 && getActivity().isInMultiWindowMode()) &&
                     res.getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
                 spanCount--;
             }
@@ -604,24 +602,20 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                                 .findFirst();
                         String leftAccountTitle = leftAccount == null ? null : leftAccount.getTitle();
 
-                        if (TextUtils.isEmpty(leftAccountTitle)) {
-                            vh.left.setText(R.string.unknown);
-                        } else {
-                            switch (leftAccountType) {
-                                case WhooingKeyValues.ASSETS: {
-                                    leftAccountTitle += "+";
-                                    break;
-                                }
-                                case WhooingKeyValues.LIABILITIES:case WhooingKeyValues.CAPITAL: {
-                                    leftAccountTitle += "-";
-                                    break;
-                                }
-                                default: {
-                                    break;
-                                }
+                        switch (leftAccountType) {
+                            case WhooingKeyValues.ASSETS: {
+                                leftAccountTitle += "+";
+                                break;
                             }
-                            vh.left.setText(leftAccountTitle);
+                            case WhooingKeyValues.LIABILITIES:case WhooingKeyValues.CAPITAL: {
+                                leftAccountTitle += "-";
+                                break;
+                            }
+                            default: {
+                                break;
+                            }
                         }
+                        vh.left.setText(leftAccountTitle);
                     }
                     if (TextUtils.isEmpty(rightAccountType)) {
                         vh.right.setText(R.string.not_assigned);
@@ -632,24 +626,20 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                                 .findFirst();
                         String rightAccountTitle = rightAccount == null ? null : rightAccount.getTitle();
 
-                        if (TextUtils.isEmpty(rightAccountTitle)) {
-                            vh.left.setText(R.string.unknown);
-                        } else {
-                            switch (rightAccountType) {
-                                case WhooingKeyValues.ASSETS: {
-                                    rightAccountTitle += "-";
-                                    break;
-                                }
-                                case WhooingKeyValues.LIABILITIES:case WhooingKeyValues.CAPITAL: {
-                                    rightAccountTitle += "+";
-                                    break;
-                                }
-                                default: {
-                                    break;
-                                }
+                        switch (rightAccountType) {
+                            case WhooingKeyValues.ASSETS: {
+                                rightAccountTitle += "-";
+                                break;
                             }
-                            vh.right.setText(rightAccountTitle);
+                            case WhooingKeyValues.LIABILITIES:case WhooingKeyValues.CAPITAL: {
+                                rightAccountTitle += "+";
+                                break;
+                            }
+                            default: {
+                                break;
+                            }
                         }
+                        vh.right.setText(rightAccountTitle);
                     }
                     break;
                 }
