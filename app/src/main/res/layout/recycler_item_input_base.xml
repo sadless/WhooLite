@@ -50,7 +50,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:ellipsize="end"
-                android:singleLine="true"
+                android:maxLines="1"
                 android:textAppearance="@style/TextAppearance.AppCompat.Small"
                 android:textColor="#a0a0a0" />
 
@@ -61,7 +61,7 @@
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:gravity="end"
-                android:singleLine="true"
+                android:maxLines="1"
                 android:textAppearance="@style/TextAppearance.AppCompat.Small"
                 android:textColor="#a0a0a0" />
         </LinearLayout>

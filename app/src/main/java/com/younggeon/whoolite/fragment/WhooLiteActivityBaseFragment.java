@@ -48,8 +48,10 @@ import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.WhooingBaseLoader;
 
 import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Currency;
+import java.util.Locale;
 
 import io.realm.Realm;
 import io.realm.RealmChangeListener;
@@ -82,6 +84,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
     protected Realm mRealm;
     protected ObservableInt mDataCount;
     protected ObservableField<String> mQueryText;
+    protected SimpleDateFormat mEntryDateFormat;
 
     protected ActionMode mActionMode;
     protected FragmentWhooLiteBaseBinding mBinding;
@@ -121,6 +124,7 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
         mBinding.setFailed(mFailed = new ObservableBoolean(false));
         mBinding.setQueryText(mQueryText = new ObservableField<>());
         mBinding.setNoSearchResultText(getString(R.string.no_search_result));
+        mEntryDateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
 
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
 

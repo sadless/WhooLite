@@ -13,7 +13,6 @@ import android.support.v7.view.ActionMode;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -38,7 +37,6 @@ import com.younggeon.whoolite.whooing.loader.WhooingBaseLoader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Locale;
 
 import io.realm.RealmChangeListener;
 import io.realm.RealmQuery;
@@ -57,7 +55,6 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
     public static final String ARG_MERGE_ARGUMENTS = "merge_arguments";
 
     private String[] mSlotNumberItems;
-    private SimpleDateFormat mEntryDateFormat;
     private SimpleDateFormat mSectionDateFormat;
     private RealmQuery<Entry> mQuery;
     private RealmResults<Entry> mEntries;
@@ -122,7 +119,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                 memo = "";
             }
             if (entryDate == null) {
-                entryDate = new SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(new Date());
+                entryDate = mEntryDateFormat.format(new Date());
             }
             mQuery = mQuery.equalTo("sectionId", mMergeArguments.getString(WhooingKeyValues.SECTION_ID))
                     .equalTo("entryDate", Integer.parseInt(entryDate))
@@ -152,7 +149,6 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                 showSelectSlotNumber();
             }
         }
-        mEntryDateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
         if (getArguments() != null) {
             mMergeArguments = getArguments().getBundle(ARG_MERGE_ARGUMENTS);
             mActionMenuId = R.menu.action_menu_select_merging_entry;
@@ -517,7 +513,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
 
             for (Entry item : items) {
                 int entryDate = item.getEntryDate();
-                if (mEntryDateFormat != null && mSectionDateFormat != null) {
+                if (mSectionDateFormat != null) {
                     try {
                         mSectionTitles[i] = mSectionDateFormat.format(mEntryDateFormat.parse("" + entryDate));
                     } catch (ParseException e) {

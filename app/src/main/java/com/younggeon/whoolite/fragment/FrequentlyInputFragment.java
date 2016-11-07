@@ -42,10 +42,8 @@ import com.younggeon.whoolite.util.Utility;
 import com.younggeon.whoolite.whooing.loader.EntriesLoader;
 import com.younggeon.whoolite.whooing.loader.FrequentItemsLoader;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Locale;
 import java.util.Set;
 
 import io.realm.Realm;
@@ -89,7 +87,6 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
     private boolean mMergingItemSpecified;
     private Bundle mSendArguments;
     private AlertDialog mSendMergeAlertDialog;
-    private SimpleDateFormat mEntryDateFormat;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -125,7 +122,6 @@ public class FrequentlyInputFragment extends WhooLiteActivityBaseFragment implem
 
         View view = super.onCreateView(inflater, container, savedInstanceState);
 
-        mEntryDateFormat = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
         mQueryText.set(queryText);
         mBinding.setReceiveFailedText(getString(R.string.failed_to_receive_frequent_item));
         mBinding.setNoDataText(getString(R.string.no_frequent_items));
