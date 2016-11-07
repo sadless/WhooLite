@@ -575,8 +575,13 @@ public abstract class WhooLiteActivityBaseFragment extends Fragment implements L
                         vh.icon.setBackgroundResource(R.drawable.selected_icon_bg);
                         vh.itemView.setBackgroundResource(R.color.primary);
                     } else {
-                        vh.icon.setImageDrawable(mIconBuilder.build(title.substring(0, 1),
-                                ColorGenerator.MATERIAL.getColor(title)));
+                        if (title.length() > 0) {
+                            vh.icon.setImageDrawable(mIconBuilder.build(title.substring(0, 1),
+                                    ColorGenerator.MATERIAL.getColor(title)));
+                        } else {
+                            vh.icon.setImageDrawable(mIconBuilder.build("",
+                                    ColorGenerator.MATERIAL.getColor("")));
+                        }
                         if (Build.VERSION.SDK_INT >= 16) {
                             vh.icon.setBackground(vh.iconSelectableBackground);
                             vh.itemView.setBackground(vh.itemViewSelectableBackground);

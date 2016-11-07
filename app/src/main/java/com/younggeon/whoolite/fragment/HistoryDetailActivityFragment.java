@@ -197,9 +197,7 @@ public class HistoryDetailActivityFragment extends DetailActivityBaseFragment {
                 return true;
             }
             case R.id.action_send: {
-                if (TextUtils.isEmpty(mTitle.getText())) {
-                    mTitle.setError(getString(R.string.input_item_title));
-                } else if (TextUtils.isEmpty(mLeftAccountType)) {
+                if (TextUtils.isEmpty(mLeftAccountType)) {
                     mLeft.performClick();
                 } else if (TextUtils.isEmpty(mRightAccountType)) {
                     mRight.performClick();
