@@ -159,13 +159,9 @@ public class EntriesLoader extends WhooingBaseLoader {
                 Uri.Builder builder = Uri.parse(URI_ENTRIES).buildUpon();
                 int resultCode;
                 long entryId = args.getLong(WhooingKeyValues.ENTRY_ID);
-                int slotNumber = args.getInt(ARG_SLOT_NUMBER, -1);
-                String frequentItemId = args.getString(WhooingKeyValues.ITEM_ID);
 
                 builder.appendPath(entryId + ".json");
                 args.remove(WhooingKeyValues.ENTRY_ID);
-                args.remove(ARG_SLOT_NUMBER);
-                args.remove(WhooingKeyValues.ITEM_ID);
                 WhooLiteNetwork.requestQueue.add(new WhooLiteNetwork.WhooingRequest(method,
                         builder.build().toString(),
                         mRequestFuture,
@@ -184,7 +180,6 @@ public class EntriesLoader extends WhooingBaseLoader {
                                 .equalTo("entryId", entryId).findFirst();
 
                         realm.beginTransaction();
-                        updateUseInfo(realm, sectionId, slotNumber, frequentItemId);
                         setEntryFromJson(entry, resultItem);
                         realm.commitTransaction();
                         realm.close();
@@ -194,8 +189,6 @@ public class EntriesLoader extends WhooingBaseLoader {
                     resultCode = -1;
                 }
                 args.putLong(WhooingKeyValues.ENTRY_ID, entryId);
-                args.putInt(ARG_SLOT_NUMBER, slotNumber);
-                args.putString(WhooingKeyValues.ITEM_ID, frequentItemId);
 
                 return resultCode;
             }
