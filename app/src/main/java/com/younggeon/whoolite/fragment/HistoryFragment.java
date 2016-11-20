@@ -121,8 +121,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
             if (entryDate == null) {
                 entryDate = mEntryDateFormat.format(new Date());
             }
-            mQuery = mQuery.equalTo("sectionId", mMergeArguments.getString(WhooingKeyValues.SECTION_ID))
-                    .equalTo("entryDate", Integer.parseInt(entryDate))
+            mQuery = mQuery.equalTo("entryDate", Integer.parseInt(entryDate))
                     .equalTo("title", mMergeArguments.getString(WhooingKeyValues.ITEM_TITLE))
                     .equalTo("leftAccountType", mMergeArguments.getString(WhooingKeyValues.LEFT_ACCOUNT_TYPE))
                     .equalTo("leftAccountId", mMergeArguments.getString(WhooingKeyValues.LEFT_ACCOUNT_ID))
