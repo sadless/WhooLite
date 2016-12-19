@@ -114,6 +114,7 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
         if (mMergeArguments != null) {
             String memo = mMergeArguments.getString(WhooingKeyValues.MEMO);
             String entryDate = mMergeArguments.getString(WhooingKeyValues.ENTRY_DATE);
+            long entryId = mMergeArguments.getLong(WhooingKeyValues.ENTRY_ID, -1);
 
             if (memo == null) {
                 memo = "";
@@ -128,6 +129,9 @@ public class HistoryFragment extends WhooLiteActivityBaseFragment {
                     .equalTo("rightAccountType", mMergeArguments.getString(WhooingKeyValues.RIGHT_ACCOUNT_TYPE))
                     .equalTo("rightAccountId", mMergeArguments.getString(WhooingKeyValues.RIGHT_ACCOUNT_ID))
                     .equalTo("memo", memo);
+            if (entryId >= 0) {
+                mQuery = mQuery.notEqualTo("entryId", entryId);
+            }
         }
         if (mEntries != null) {
             mEntries.removeChangeListeners();

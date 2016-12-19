@@ -106,6 +106,7 @@
     <string name="merge">병합하기</string>
     <string name="merge_confirm">최근 내역중에 같은 내용으로 입력된 항목이 있습니다. 금액을 더해서 하나의 항목으로 병합할까요?</string>
     <string name="new_entry">새 항목으로 입력</string>
+    <string name="edit_this_entry_only">이 항목만 수정</string>
 
     <string-array name="pref_show_slot_number_titles">
         <item>1번 슬롯</item>

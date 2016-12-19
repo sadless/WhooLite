@@ -532,7 +532,7 @@ public abstract class DetailActivityBaseFragment extends Fragment implements Loa
                             startActivityForResult(intent, REQUEST_CODE_MERGE_FOR_EDIT_SEND);
                         }
                     }
-                }).setNegativeButton(R.string.new_entry, new DialogInterface.OnClickListener() {
+                }).setNegativeButton(R.string.edit_this_entry_only, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         mProgress = ProgressDialog.show(getActivity(), null, getString(R.string.please_wait));
